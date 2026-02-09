@@ -1,0 +1,3 @@
+[submodule "suricata-rule-parser"]
+	path = suricata-rule-parser
+	url = git@github.com:Schwaggot/suricata-rule-parser.git

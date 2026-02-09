@@ -1,2 +1,257 @@
 # suricata-rule-scoring
-A scoring system for Suricata IDS rules.
+
+A library and CLI tool that evaluates Suricata IDS rules against configurable scoring criteria, producing two numerical
+scores per rule: a **quality score** (how well-written and effective the rule is) and a **false-positive score** (how
+likely the rule is to generate false positives).
+
+## Installation
+
+Requires Python 3.10+.
+
+```bash
+# Install the parser submodule first
+pip install -e suricata-rule-parser/
+
+# Install the scorer
+pip install -e .
+```
+
+## Quick Start
+
+### CLI
+
+```bash
+# Score a rules file (JSON output)
+suricata-rule-scorer score rules/et-open/emerging-malware.rules
+
+# CSV output with summary statistics
+suricata-rule-scorer score rules/et-open/emerging-malware.rules --format csv --stats
+
+# Filter and sort
+suricata-rule-scorer score rules/et-open/emerging-malware.rules --min-quality 20 --max-fp 10 --sort-by quality
+
+# Verbose output (includes matched criteria)
+suricata-rule-scorer score rules/et-open/emerging-malware.rules --verbose
+
+# Use a custom scoring profile
+suricata-rule-scorer score rules/et-open/emerging-malware.rules --config my_profile.yaml
+
+# Write results to file
+suricata-rule-scorer score rules/et-open/emerging-malware.rules --output results.json
+```
+
+### Library API
+
+```python
+from suricata_rule_scoring import RuleScorer, summarize
+from suricata_rule_parser import parse_file, parse_rule
+
+# Score a file of rules
+scorer = RuleScorer()
+rules = parse_file("rules/et-open/emerging-malware.rules")
+results = scorer.score_many(rules)
+
+# Inspect individual results
+for r in results[:3]:
+    print(f"SID {r.sid}: quality={r.quality}, fp={r.false_positive}")
+
+# Summary statistics
+stats = summarize(results)
+print(f"Rules: {stats.total_rules}")
+print(f"Quality — mean: {stats.mean_quality}, median: {stats.median_quality}")
+print(f"FP      — mean: {stats.mean_false_positive}, median: {stats.median_false_positive}")
+
+# Score a single rule
+rule = parse_rule(
+    'alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"Example"; content:"GET"; flow:established; sid:1; rev:1;)')
+result = scorer.score(rule)
+print(result.quality, result.false_positive)
+
+# Custom scoring profile
+scorer = RuleScorer.from_config("my_profile.yaml")
+
+# Register a plugin programmatically
+from suricata_rule_scoring.models import ScoringResult
+
+
+def my_check(rule):
+    if len(rule.options.content) == 0:
+        return ScoringResult(dimension="quality", delta=-20, reason="No content")
+    return None
+
+
+scorer.register_plugin("my_check", my_check)
+```
+
+## Scoring Model
+
+Each rule receives two independent scores:
+
+| Score              | Meaning                                            | Direction              |
+|--------------------|----------------------------------------------------|------------------------|
+| **quality**        | How well-constructed and effective the rule is     | Higher = better        |
+| **false_positive** | How likely the rule is to generate false positives | Higher = more FP-prone |
+
+Both scores start at a configurable base value (default: 0) and are modified by criteria that add or subtract weighted
+points.
+
+### Default Quality Criteria
+
+| ID                     | Weight | Condition                                   |
+|------------------------|--------|---------------------------------------------|
+| `has_content_match`    | +10    | Has at least one `content` keyword          |
+| `has_fast_pattern`     | +5     | Uses `fast_pattern`                         |
+| `specific_protocol`    | +5     | Protocol is not `ip`                        |
+| `has_flow_direction`   | +5     | Specifies `flow` keyword                    |
+| `has_reference`        | +3     | Includes a reference (CVE, URL, etc.)       |
+| `has_classtype`        | +3     | Includes `classtype`                        |
+| `has_metadata`         | +2     | Includes `metadata`                         |
+| `tls_fingerprint`      | +15    | Matches TLS cert/JA3/JA4 fingerprint fields |
+| `deep_content`         | +8     | 3+ content matches                          |
+| `pcre_without_content` | -10    | PCRE with no content anchor                 |
+| `no_content_match`     | -15    | No content, pcre, or app-layer match        |
+| `tiny_payload`         | -10    | Matches fewer than 3 bytes total (plugin)   |
+| `missing_sid_or_rev`   | -5     | Lacks `sid` or `rev`                        |
+| `any_any_source`       | -3     | Source address and port are both `any`      |
+| `any_any_dest`         | -3     | Destination address and port are both `any` |
+
+### Default False-Positive Criteria
+
+| ID                    | Weight | Condition                                      |
+|-----------------------|--------|------------------------------------------------|
+| `broad_network_scope` | +10    | Both src and dst addresses are `any`           |
+| `any_ports`           | +5     | Both src and dst ports are `any`               |
+| `generic_protocol`    | +5     | `ip`/`tcp` with no app-layer keywords (plugin) |
+| `few_content_matches` | +8     | Single content match under 5 bytes (plugin)    |
+| `no_flow_state`       | +5     | No `flow` keyword                              |
+| `pcre_only`           | +7     | PCRE-only detection, no content anchor         |
+| `specific_tls_match`  | -10    | Matches specific TLS/cert/JA3/JA4 attributes   |
+| `specific_dns_query`  | -8     | Matches specific DNS query                     |
+| `tight_port_scope`    | -5     | Both ports are specific (not `any`)            |
+| `multi_content`       | -5     | 3+ content matches                             |
+| `has_threshold`       | -5     | Uses `threshold` or `detection_filter`         |
+
+## Custom Scoring Profiles
+
+Override the defaults with a YAML file:
+
+```yaml
+scoring:
+  quality:
+    base: 0
+    min: null   # null = unclamped
+    max: null
+  false_positive:
+    base: 0
+    min: 0
+    max: 50
+
+criteria:
+  - id: has_content
+    name: "Has content"
+    description: "Rule contains at least one content keyword"
+    dimension: quality
+    weight: 20
+    condition:
+      field: "options.content"
+      operator: "exists"
+
+  - id: broad_scope
+    name: "Broad scope"
+    description: "Source and dest are both any"
+    dimension: false_positive
+    weight: 15
+    condition:
+      operator: "all"
+      conditions:
+        - field: "source_address"
+          operator: "eq"
+          value: "any"
+        - field: "destination_address"
+          operator: "eq"
+          value: "any"
+
+plugins:
+  - id: my_plugin
+    name: "My custom check"
+    callable: "my_module.my_function"
+```
+
+### Condition Operators
+
+| Operator                 | Description                           | Example                    |
+|--------------------------|---------------------------------------|----------------------------|
+| `exists`                 | Field is truthy (not null/empty/zero) | `field: "options.content"` |
+| `not_exists`             | Field is falsy                        | `field: "options.pcre"`    |
+| `eq` / `neq`             | Equality / inequality                 | `value: "tcp"`             |
+| `in` / `not_in`          | Set membership                        | `value: ["tcp", "udp"]`    |
+| `gt`, `gte`, `lt`, `lte` | Numeric comparison                    | `value: 3`                 |
+| `contains`               | Value in list/string                  | `value: "established"`     |
+| `not`                    | Negate a sub-condition                | `condition: { ... }`       |
+| `all` / `any`            | All/any sub-conditions match          | `conditions: [...]`        |
+
+### Field Paths
+
+| Pattern                                         | Resolves to                                 |
+|-------------------------------------------------|---------------------------------------------|
+| `protocol`, `action`, `direction`               | `rule.header.*`                             |
+| `source_address`, `destination_address`         | `rule.header.source_ip` / `dest_ip`         |
+| `source_port`, `destination_port`               | `rule.header.source_port` / `dest_port`     |
+| `options.content`, `options.flow`, etc.         | Direct `RuleOptions` attributes             |
+| `options.pcre`, `options.fast_pattern`          | `RuleOptions.other_options` dict            |
+| `options.tls.cert_subject`, `options.dns.query` | Dotted Suricata keywords in `other_options` |
+| `options.tls_cert_fingerprint`                  | Flag-style keywords (presence = truthy)     |
+| `options.content\|count`                        | `len()` of the content list                 |
+
+## Plugin System
+
+Plugins handle scoring logic too complex for declarative YAML conditions (e.g., computing content byte lengths,
+cross-referencing multiple fields).
+
+```python
+from suricata_rule_scoring.models import ScoringResult
+
+
+def my_plugin(rule):
+    """Return ScoringResult or None if criterion doesn't apply."""
+    total_bytes = sum(len(c) for c in rule.options.content)
+    if total_bytes < 5:
+        return ScoringResult(
+            dimension="quality",
+            delta=-12,
+            reason=f"Rule matches only {total_bytes} bytes",
+        )
+    return None
+```
+
+Register via YAML (`callable: "my_module:my_plugin"`) or programmatically (`scorer.register_plugin("id", my_plugin)`).
+
+Three built-in plugins ship with the default profile: `tiny_payload`, `few_content_matches`, and `generic_protocol`.
+
+## CLI Reference
+
+```
+suricata-rule-scorer score <rules_file> [options]
+```
+
+| Option                              | Description                        | Default           |
+|-------------------------------------|------------------------------------|-------------------|
+| `--config PATH`                     | Custom YAML scoring profile        | built-in defaults |
+| `--format json\|csv`                | Output format                      | `json`            |
+| `--output PATH`                     | Write to file instead of stdout    | stdout            |
+| `--stats`                           | Print summary statistics to stderr | off               |
+| `--sort-by quality\|false_positive` | Sort output                        | unsorted          |
+| `--min-quality FLOAT`               | Filter: quality >= n               | none              |
+| `--max-fp FLOAT`                    | Filter: false_positive <= n        | none              |
+| `--verbose`                         | Include matched criteria in output | off               |
+
+## Testing
+
+```bash
+pip install pytest
+pytest tests/ -v
+```
+
+## License
+
+MIT

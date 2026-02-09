@@ -1,0 +1,394 @@
+# Default scoring profile for suricata-rule-scorer
+# Implements all 26 criteria from the PRD (sections 5.1 and 5.2)
+
+scoring:
+  quality:
+    base: 0
+    min: null
+    max: null
+  false_positive:
+    base: 0
+    min: null
+    max: null
+
+criteria:
+  # =========================================
+  # Quality Criteria (PRD 5.1)
+  # =========================================
+
+  - id: has_content_match
+    name: "Has content match"
+    description: "Rule contains at least one content keyword"
+    dimension: quality
+    weight: 10
+    condition:
+      field: "options.content"
+      operator: "exists"
+
+  - id: has_fast_pattern
+    name: "Uses fast_pattern"
+    description: "Rule uses fast_pattern for performance"
+    dimension: quality
+    weight: 5
+    condition:
+      field: "options.fast_pattern"
+      operator: "exists"
+
+  - id: specific_protocol
+    name: "Specific protocol"
+    description: "Protocol is not ip (i.e., narrows to tcp/udp/http/tls/etc.)"
+    dimension: quality
+    weight: 5
+    condition:
+      field: "protocol"
+      operator: "neq"
+      value: "ip"
+
+  - id: has_flow_direction
+    name: "Has flow keyword"
+    description: "Rule specifies flow (established, to_server, etc.)"
+    dimension: quality
+    weight: 5
+    condition:
+      field: "options.flow"
+      operator: "exists"
+
+  - id: has_reference
+    name: "Has reference"
+    description: "Rule includes a reference (CVE, URL, etc.)"
+    dimension: quality
+    weight: 3
+    condition:
+      field: "options.reference"
+      operator: "exists"
+
+  - id: has_classtype
+    name: "Has classtype"
+    description: "Rule includes classtype metadata"
+    dimension: quality
+    weight: 3
+    condition:
+      field: "options.classtype"
+      operator: "exists"
+
+  - id: has_metadata
+    name: "Has metadata"
+    description: "Rule includes metadata keyword"
+    dimension: quality
+    weight: 2
+    condition:
+      field: "options.metadata"
+      operator: "exists"
+
+  - id: tls_fingerprint
+    name: "TLS fingerprint match"
+    description: "Rule matches on TLS certificate or JA3 fields"
+    dimension: quality
+    weight: 15
+    condition:
+      operator: "any"
+      conditions:
+        - field: "options.tls.cert_subject"
+          operator: "exists"
+        - field: "options.tls.cert_serial"
+          operator: "exists"
+        - field: "options.tls_cert_subject"
+          operator: "exists"
+        - field: "options.tls_cert_serial"
+          operator: "exists"
+        - field: "options.tls.cert_fingerprint"
+          operator: "exists"
+        - field: "options.tls_cert_fingerprint"
+          operator: "exists"
+        - field: "options.tls.fingerprint"
+          operator: "exists"
+        - field: "options.ja3.hash"
+          operator: "exists"
+        - field: "options.ja3_hash"
+          operator: "exists"
+        - field: "options.ja3s.hash"
+          operator: "exists"
+        - field: "options.ja3s_hash"
+          operator: "exists"
+        - field: "options.ja4.hash"
+          operator: "exists"
+
+  - id: deep_content
+    name: "Deep content inspection"
+    description: "Rule has 3+ content matches"
+    dimension: quality
+    weight: 8
+    condition:
+      field: "options.content|count"
+      operator: "gte"
+      value: 3
+
+  - id: pcre_without_content
+    name: "PCRE without content prefilter"
+    description: "Uses PCRE without content to anchor, hurting performance and quality"
+    dimension: quality
+    weight: -10
+    condition:
+      operator: "all"
+      conditions:
+        - field: "options.pcre"
+          operator: "exists"
+        - operator: "not"
+          condition:
+            field: "options.content"
+            operator: "exists"
+
+  - id: no_content_match
+    name: "No content match"
+    description: "Rule has zero content, pcre, or app-layer match keywords"
+    dimension: quality
+    weight: -15
+    condition:
+      operator: "all"
+      conditions:
+        - operator: "not"
+          condition:
+            field: "options.content"
+            operator: "exists"
+        - operator: "not"
+          condition:
+            field: "options.pcre"
+            operator: "exists"
+        - operator: "not"
+          condition:
+            field: "options.dns.query"
+            operator: "exists"
+        - operator: "not"
+          condition:
+            field: "options.dns_query"
+            operator: "exists"
+        - operator: "not"
+          condition:
+            field: "options.tls.cert_subject"
+            operator: "exists"
+        - operator: "not"
+          condition:
+            field: "options.tls_cert_subject"
+            operator: "exists"
+        - operator: "not"
+          condition:
+            field: "options.http_uri"
+            operator: "exists"
+        - operator: "not"
+          condition:
+            field: "options.http_header"
+            operator: "exists"
+        - operator: "not"
+          condition:
+            field: "options.http.uri"
+            operator: "exists"
+
+  # tiny_payload — requires built-in plugin (see plugins section below)
+
+  - id: missing_sid_or_rev
+    name: "Missing SID or revision"
+    description: "Rule lacks sid or rev"
+    dimension: quality
+    weight: -5
+    condition:
+      operator: "any"
+      conditions:
+        - operator: "not"
+          condition:
+            field: "options.sid"
+            operator: "exists"
+        - operator: "not"
+          condition:
+            field: "options.rev"
+            operator: "exists"
+
+  - id: any_any_source
+    name: "Source is any/any"
+    description: "Source address and port are both any"
+    dimension: quality
+    weight: -3
+    condition:
+      operator: "all"
+      conditions:
+        - field: "source_address"
+          operator: "eq"
+          value: "any"
+        - field: "source_port"
+          operator: "eq"
+          value: "any"
+
+  - id: any_any_dest
+    name: "Destination is any/any"
+    description: "Destination address and port are both any"
+    dimension: quality
+    weight: -3
+    condition:
+      operator: "all"
+      conditions:
+        - field: "destination_address"
+          operator: "eq"
+          value: "any"
+        - field: "destination_port"
+          operator: "eq"
+          value: "any"
+
+  # =========================================
+  # False-Positive Criteria (PRD 5.2)
+  # =========================================
+
+  - id: broad_network_scope
+    name: "Broad network scope"
+    description: "Both source and destination addresses are any — high FP risk"
+    dimension: false_positive
+    weight: 10
+    condition:
+      operator: "all"
+      conditions:
+        - field: "source_address"
+          operator: "eq"
+          value: "any"
+        - field: "destination_address"
+          operator: "eq"
+          value: "any"
+
+  - id: any_ports
+    name: "Any ports"
+    description: "Both source and destination ports are any"
+    dimension: false_positive
+    weight: 5
+    condition:
+      operator: "all"
+      conditions:
+        - field: "source_port"
+          operator: "eq"
+          value: "any"
+        - field: "destination_port"
+          operator: "eq"
+          value: "any"
+
+  # generic_protocol — requires built-in plugin
+
+  # few_content_matches — requires built-in plugin
+
+  - id: no_flow_state
+    name: "No flow state"
+    description: "Rule does not specify flow keyword"
+    dimension: false_positive
+    weight: 5
+    condition:
+      operator: "not"
+      condition:
+        field: "options.flow"
+        operator: "exists"
+
+  - id: pcre_only
+    name: "PCRE-only detection"
+    description: "Detection relies solely on PCRE with no content anchoring"
+    dimension: false_positive
+    weight: 7
+    condition:
+      operator: "all"
+      conditions:
+        - field: "options.pcre"
+          operator: "exists"
+        - operator: "not"
+          condition:
+            field: "options.content"
+            operator: "exists"
+
+  - id: specific_tls_match
+    name: "Specific TLS/cert match"
+    description: "Rule matches specific TLS attributes (low FP risk)"
+    dimension: false_positive
+    weight: -10
+    condition:
+      operator: "any"
+      conditions:
+        - field: "options.tls.cert_subject"
+          operator: "exists"
+        - field: "options.tls.cert_serial"
+          operator: "exists"
+        - field: "options.tls_cert_subject"
+          operator: "exists"
+        - field: "options.tls_cert_serial"
+          operator: "exists"
+        - field: "options.tls.cert_fingerprint"
+          operator: "exists"
+        - field: "options.tls_cert_fingerprint"
+          operator: "exists"
+        - field: "options.tls.fingerprint"
+          operator: "exists"
+        - field: "options.ja3.hash"
+          operator: "exists"
+        - field: "options.ja3_hash"
+          operator: "exists"
+        - field: "options.ja3s.hash"
+          operator: "exists"
+        - field: "options.ja3s_hash"
+          operator: "exists"
+        - field: "options.ja4.hash"
+          operator: "exists"
+
+  - id: specific_dns_query
+    name: "Specific DNS query match"
+    description: "Rule matches specific DNS query content"
+    dimension: false_positive
+    weight: -8
+    condition:
+      operator: "any"
+      conditions:
+        - field: "options.dns.query"
+          operator: "exists"
+        - field: "options.dns_query"
+          operator: "exists"
+
+  - id: tight_port_scope
+    name: "Tight port scope"
+    description: "Rule targets a specific port or narrow port range"
+    dimension: false_positive
+    weight: -5
+    condition:
+      operator: "all"
+      conditions:
+        - field: "source_port"
+          operator: "neq"
+          value: "any"
+        - field: "destination_port"
+          operator: "neq"
+          value: "any"
+
+  - id: multi_content
+    name: "Multiple content matches"
+    description: "Rule has 3+ content matches (higher specificity)"
+    dimension: false_positive
+    weight: -5
+    condition:
+      field: "options.content|count"
+      operator: "gte"
+      value: 3
+
+  - id: has_threshold
+    name: "Has threshold/detection_filter"
+    description: "Rule includes threshold or detection_filter to limit alerts"
+    dimension: false_positive
+    weight: -5
+    condition:
+      operator: "any"
+      conditions:
+        - field: "options.threshold"
+          operator: "exists"
+        - field: "options.detection_filter"
+          operator: "exists"
+
+plugins:
+  - id: tiny_payload
+    name: "Tiny payload match"
+    callable: "suricata_rule_scoring.plugin:builtin_tiny_payload"
+
+  - id: few_content_matches
+    name: "Few content matches"
+    callable: "suricata_rule_scoring.plugin:builtin_few_content_matches"
+
+  - id: generic_protocol
+    name: "Generic protocol"
+    callable: "suricata_rule_scoring.plugin:builtin_generic_protocol"

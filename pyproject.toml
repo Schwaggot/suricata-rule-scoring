@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "suricata-rule-scoring"
+version = "0.1.0"
+description = "Evaluate Suricata IDS rules against configurable scoring criteria, producing quality and false-positive scores."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Schwaggot" },
+]
+keywords = ["suricata", "ids", "scoring", "rules", "security"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: System :: Networking :: Monitoring",
+]
+dependencies = [
+    "suricata-rule-parser",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+suricata-rule-scorer = "suricata_rule_scoring.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Schwaggot/suricata-rule-scoring"
+Repository = "https://github.com/Schwaggot/suricata-rule-scoring"
+Issues = "https://github.com/Schwaggot/suricata-rule-scoring/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["suricata_rule_scoring"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM"]

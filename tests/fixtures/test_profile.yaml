@@ -1,0 +1,38 @@
+# Minimal custom profile for testing overrides
+
+scoring:
+  quality:
+    base: 10
+    min: -50
+    max: 100
+  false_positive:
+    base: 5
+    min: 0
+    max: 50
+
+criteria:
+  - id: has_content
+    name: "Has content"
+    description: "Rule has at least one content match"
+    dimension: quality
+    weight: 20
+    condition:
+      field: "options.content"
+      operator: "exists"
+
+  - id: broad_scope
+    name: "Broad scope"
+    description: "Source and dest are both any"
+    dimension: false_positive
+    weight: 15
+    condition:
+      operator: "all"
+      conditions:
+        - field: "source_address"
+          operator: "eq"
+          value: "any"
+        - field: "destination_address"
+          operator: "eq"
+          value: "any"
+
+plugins: []

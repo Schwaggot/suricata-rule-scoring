@@ -1,0 +1,34 @@
+# Sample rules for testing suricata-rule-scorer
+
+# High quality rule: content, fast_pattern, flow, classtype, reference, metadata, specific protocol+port
+alert http $HOME_NET any -> $EXTERNAL_NET 443 (msg:"ET MALWARE High Quality Rule Example"; flow:established,to_server; content:"GET"; http_method; content:"/malware/callback"; http_uri; fast_pattern; content:"Host|3a 20|evil.com"; http_header; reference:url,example.com/analysis; classtype:trojan-activity; sid:9000001; rev:3; metadata:created_at 2024_01_01, attack_target Client_Endpoint;)
+
+# Poor quality rule: no content, no flow, any/any, generic protocol
+alert ip any any -> any any (msg:"ET BAD Poor Quality Rule"; sid:9000002; rev:1; classtype:bad-unknown;)
+
+# PCRE-only rule: pcre without content
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE PCRE Only Rule"; flow:established,to_server; pcre:"/^GET\s+\/[a-z]{8}\.(php|asp)/i"; classtype:trojan-activity; sid:9000003; rev:1; metadata:created_at 2024_01_01;)
+
+# Tiny payload rule: single very short content
+alert tcp any any -> any 80 (msg:"ET TEST Tiny Payload"; flow:established,to_server; content:"AB"; classtype:misc-activity; sid:9000004; rev:1;)
+
+# TLS fingerprint rule
+alert tls $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE TLS Fingerprint Match"; tls_cert_subject; content:"CN=malware.example.com"; flow:established,to_server; classtype:trojan-activity; sid:9000005; rev:1; metadata:created_at 2024_01_01;)
+
+# Rule with threshold
+alert tcp $HOME_NET any -> $EXTERNAL_NET 80 (msg:"ET TEST Rule With Threshold"; flow:established,to_server; content:"suspicious"; threshold:type both,track by_src,count 10,seconds 60; classtype:misc-activity; sid:9000006; rev:1;)
+
+# Rule missing SID (edge case — parser may handle this differently)
+# alert tcp any any -> any any (msg:"No SID rule"; content:"test"; rev:1;)
+
+# DNS query rule
+alert dns $HOME_NET any -> any any (msg:"ET DNS Specific Query"; dns_query; content:"malicious-domain.com"; classtype:trojan-activity; sid:9000007; rev:1; metadata:created_at 2024_01_01; flow:established,to_server;)
+
+# Multi-content deep inspection rule
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"ET MALWARE Deep Inspection Rule"; flow:established,to_server; content:"POST"; http_method; content:"/api/upload"; http_uri; content:"Content-Type|3a 20|multipart"; http_header; content:"|89 50 4E 47|"; fast_pattern; reference:url,example.com; classtype:trojan-activity; sid:9000008; rev:2; metadata:created_at 2024_01_01;)
+
+# Rule with specific ports on both sides (tight port scope)
+alert tcp $HOME_NET 1024:65535 -> $EXTERNAL_NET 443 (msg:"ET TEST Tight Ports"; flow:established,to_server; content:"ClientHello"; classtype:misc-activity; sid:9000009; rev:1;)
+
+# Generic tcp, no app-layer keywords
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (msg:"ET TEST Generic TCP"; flow:established; content:"|DE AD BE EF|"; sid:9000010; rev:1; classtype:misc-activity;)
