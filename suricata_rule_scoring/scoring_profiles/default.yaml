@@ -41,7 +41,7 @@ criteria:
     condition:
       field: "protocol"
       operator: "not_in"
-      value: ["ip", "tcp", "udp"]
+      value: ["ip", "tcp", "udp", "tcp-pkt", "tcp-stream"]
 
   - id: has_flow_direction
     name: "Has flow keyword"

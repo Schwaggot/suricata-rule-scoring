@@ -410,7 +410,7 @@ def builtin_generic_protocol(rule: SuricataRule) -> ScoringResult | None:
     False-positive dimension, weight +5.
     """
     protocol = rule.header.protocol.lower()
-    if protocol not in ("ip", "tcp", "udp"):
+    if protocol not in ("ip", "tcp", "udp", "tcp-pkt", "tcp-stream"):
         return None
 
     # Check if any app-layer keyword is used in other_options
