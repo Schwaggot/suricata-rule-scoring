@@ -8,9 +8,12 @@ from suricata_rule_parser import parse_rule
 
 from suricata_rule_scoring.plugin import (
     builtin_few_content_matches,
+    builtin_flowbits_isset,
     builtin_generic_protocol,
+    builtin_ip_ioc_fp,
     builtin_ip_ioc_rule,
     builtin_rule_age,
+    builtin_single_content_http_method,
     builtin_tiny_payload,
     compute_content_bytes,
     load_plugin,
@@ -262,6 +265,123 @@ class TestBuiltinRuleAge:
     def test_no_date_fields_returns_none(self):
         rule = self._rule_with_metadata("confidence Medium")
         result = builtin_rule_age(rule)
+        assert result is None
+
+
+class TestBuiltinFlowbitsIsset:
+    def test_isset_triggers(self):
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Flowbits isset"; flowbits:isset,ET.http.javaclient; '
+            'content:"test"; flow:established; sid:1; rev:1;)'
+        )
+        result = builtin_flowbits_isset(rule)
+        assert result is not None
+        assert result.dimension == "false_positive"
+        assert result.delta == -8
+
+    def test_set_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Flowbits set"; flowbits:set,ET.http.javaclient; '
+            'content:"test"; flow:established; sid:2; rev:1;)'
+        )
+        result = builtin_flowbits_isset(rule)
+        assert result is None
+
+    def test_no_flowbits_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp any any -> any 80 '
+            '(msg:"No flowbits"; content:"test"; flow:established; sid:3; rev:1;)'
+        )
+        result = builtin_flowbits_isset(rule)
+        assert result is None
+
+    def test_toggle_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Flowbits toggle"; flowbits:toggle,some_bit; '
+            'content:"test"; flow:established; sid:4; rev:1;)'
+        )
+        result = builtin_flowbits_isset(rule)
+        assert result is None
+
+
+class TestBuiltinIpIocFp:
+    def test_specific_ip_returns_fp_reduction(self):
+        rule = parse_rule(
+            'alert tcp $HOME_NET any -> [91.99.89.71] 443 '
+            '(msg:"ThreatFox IP"; sid:1; rev:1;)'
+        )
+        result = builtin_ip_ioc_fp(rule)
+        assert result is not None
+        assert result.dimension == "false_positive"
+        assert result.delta == -5
+
+    def test_no_specific_ip_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp $HOME_NET any -> $EXTERNAL_NET 443 '
+            '(msg:"Variables"; sid:2; rev:1;)'
+        )
+        result = builtin_ip_ioc_fp(rule)
+        assert result is None
+
+    def test_any_ip_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp any any -> any 80 '
+            '(msg:"Any"; sid:3; rev:1;)'
+        )
+        result = builtin_ip_ioc_fp(rule)
+        assert result is None
+
+
+class TestBuiltinSingleContentHttpMethod:
+    def test_single_get_triggers(self):
+        rule = parse_rule(
+            'alert http any any -> any any '
+            '(msg:"GET only"; content:"GET"; http_method; '
+            'flow:established,to_server; sid:1; rev:1;)'
+        )
+        result = builtin_single_content_http_method(rule)
+        assert result is not None
+        assert result.dimension == "false_positive"
+        assert result.delta == 8
+
+    def test_post_triggers(self):
+        rule = parse_rule(
+            'alert http any any -> any any '
+            '(msg:"POST only"; content:"POST"; http_method; '
+            'flow:established,to_server; sid:2; rev:1;)'
+        )
+        result = builtin_single_content_http_method(rule)
+        assert result is not None
+        assert result.delta == 8
+
+    def test_method_plus_uri_no_trigger(self):
+        rule = parse_rule(
+            'alert http any any -> any any '
+            '(msg:"GET with URI"; content:"GET"; http_method; '
+            'content:"/malware"; http_uri; '
+            'flow:established,to_server; sid:3; rev:1;)'
+        )
+        result = builtin_single_content_http_method(rule)
+        assert result is None
+
+    def test_no_content_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"No content"; sid:4; rev:1;)'
+        )
+        result = builtin_single_content_http_method(rule)
+        assert result is None
+
+    def test_non_method_content_no_trigger(self):
+        rule = parse_rule(
+            'alert http any any -> any any '
+            '(msg:"Specific content"; content:"evil-payload.exe"; '
+            'flow:established,to_server; sid:5; rev:1;)'
+        )
+        result = builtin_single_content_http_method(rule)
         assert result is None
 
 

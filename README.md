@@ -97,40 +97,55 @@ points.
 
 ### Default Quality Criteria
 
-| ID                     | Weight  | Condition                                     | Reasoning                                                          |
-|------------------------|---------|-----------------------------------------------|--------------------------------------------------------------------|
-| `has_content_match`    | +10     | Has at least one `content` keyword            | Content matches are the foundation of effective signature detection |
-| `has_fast_pattern`     | +5      | Uses `fast_pattern`                           | Enables the multi-pattern matcher for efficient pre-filtering      |
-| `specific_protocol`    | +5      | Protocol is not `ip`                          | Narrowing the protocol reduces unnecessary evaluation overhead     |
-| `has_flow_direction`   | +5      | Specifies `flow` keyword                      | Flow tracking ensures the rule fires at the right stage            |
-| `has_reference`        | +3      | Includes a reference (CVE, URL, etc.)         | References aid triage and link the rule to known threats            |
-| `has_classtype`        | +3      | Includes `classtype`                          | Classification enables priority-based alert handling               |
-| `has_metadata`         | +2      | Includes `metadata`                           | Metadata supports automated enrichment and filtering               |
-| `tls_fingerprint`      | +15     | Matches TLS cert/JA3/JA4 fingerprint fields   | Cryptographic fingerprints are highly specific indicators          |
-| `deep_content`         | +8      | 3+ content matches                            | Multiple content matches greatly increase detection specificity    |
-| `pcre_without_content` | -10     | PCRE with no content anchor                   | Unanchored PCRE forces full payload regex scans, hurting perf      |
-| `no_content_match`     | -10     | No content, pcre, or app-layer match          | No payload inspection means the rule relies solely on headers      |
-| `ip_ioc_rule`          | +10/+15 | Targets a specific IP; +15 with port (plugin) | Literal IP/port IoCs are valid detection even without content      |
-| `tiny_payload`         | -10     | Matches fewer than 3 bytes total (plugin)     | Very short patterns match too broadly and lack uniqueness          |
-| `rule_age`             | -5 to +5| Age from metadata date fields (plugin)        | Stale rules may target obsolete threats; fresh rules are relevant  |
-| `any_any_source`       | -3      | Source address and port are both `any`         | Unrestricted source widens the rule's attack surface               |
-| `any_any_dest`         | -3      | Destination address and port are both `any`    | Unrestricted destination means every packet is a candidate         |
+| ID                           | Weight   | Condition                                     | Reasoning                                                           |
+|------------------------------|----------|-----------------------------------------------|---------------------------------------------------------------------|
+| `has_content_match`          | +10      | Has at least one `content` keyword            | Content matches are the foundation of effective signature detection |
+| `has_fast_pattern`           | +5       | Uses `fast_pattern`                           | Enables the multi-pattern matcher for efficient pre-filtering       |
+| `specific_protocol`          | +5       | Protocol is not `ip`                          | Narrowing the protocol reduces unnecessary evaluation overhead      |
+| `has_flow_direction`         | +5       | Specifies `flow` keyword                      | Flow tracking ensures the rule fires at the right stage             |
+| `content_position_modifiers` | +5       | Uses depth/offset/distance/within             | Position-constrained content shows protocol structure awareness     |
+| `has_flowbits`               | +5       | Uses `flowbits` keyword                       | Flowbits implement multi-stage/correlated detection chains          |
+| `has_reference`              | +3       | Includes a reference (CVE, URL, etc.)         | References aid triage and link the rule to known threats            |
+| `has_classtype`              | +3       | Includes `classtype`                          | Classification enables priority-based alert handling                |
+| `has_dsize`                  | +3       | Uses `dsize` keyword                          | Payload size constraints improve performance and precision          |
+| `content_anchoring`          | +3       | Uses `startswith` or `endswith`               | Anchors content to buffer boundaries for precise matching           |
+| `has_metadata`               | +2       | Includes `metadata`                           | Metadata supports automated enrichment and filtering                |
+| `has_isdataat`               | +2       | Uses `isdataat` keyword                       | Verifies data exists at offset before matching proceeds             |
+| `tls_fingerprint`            | +15      | Matches TLS cert/JA3/JA4 fingerprint fields   | Cryptographic fingerprints are highly specific indicators           |
+| `has_byte_operations`        | +8       | Uses byte_test/byte_jump/byte_extract         | Byte-level operations represent surgical binary protocol parsing    |
+| `deep_content`               | +8       | 3+ content matches                            | Multiple content matches greatly increase detection specificity     |
+| `pcre_without_content`       | -10      | PCRE with no content anchor                   | Unanchored PCRE forces full payload regex scans, hurting perf       |
+| `no_content_match`           | -10      | No content, pcre, or app-layer match          | No payload inspection means the rule relies solely on headers       |
+| `ip_ioc_rule`                | +10/+15  | Targets a specific IP; +15 with port (plugin) | Literal IP/port IoCs are valid detection even without content       |
+| `tiny_payload`               | -10      | Matches fewer than 3 bytes total (plugin)     | Very short patterns match too broadly and lack uniqueness           |
+| `rule_age`                   | -5 to +5 | Age from metadata date fields (plugin)        | Stale rules may target obsolete threats; fresh rules are relevant   |
+| `bidirectional_rule`         | -5       | Direction is `<>` instead of `->`             | Bidirectional rules double evaluation cost and indicate imprecision |
+| `any_any_source`             | -3       | Source address and port are both `any`        | Unrestricted source widens the rule's attack surface                |
+| `any_any_dest`               | -3       | Destination address and port are both `any`   | Unrestricted destination means every packet is a candidate          |
 
 ### Default False-Positive Criteria
 
-| ID                    | Weight | Condition                                      | Reasoning                                                           |
-|-----------------------|--------|-------------------------------------------------|---------------------------------------------------------------------|
-| `broad_network_scope` | +10    | Both src and dst addresses are `any`            | Monitoring all traffic in both directions maximises false matches    |
-| `any_ports`           | +5     | Both src and dst ports are `any`                | No port restriction means every connection is evaluated             |
-| `generic_protocol`    | +5     | `ip`/`tcp` with no app-layer keywords (plugin)  | Without app-layer narrowing the rule matches raw transport traffic  |
-| `few_content_matches` | +8     | Single content match under 5 bytes (plugin)     | A short, single pattern is likely to collide with benign traffic    |
-| `no_flow_state`       | +5     | No `flow` keyword                               | Without flow state the rule fires on every packet, not just sessions|
-| `pcre_only`           | +7     | PCRE-only detection, no content anchor          | Regex-only rules are slow and prone to partial/accidental matches   |
-| `specific_tls_match`  | -10    | Matches specific TLS/cert/JA3/JA4 attributes    | Cryptographic fingerprints rarely appear in legitimate traffic      |
-| `specific_dns_query`  | -8     | Matches specific DNS query                      | Exact domain matches are unlikely to collide with normal lookups    |
-| `tight_port_scope`    | -5     | Both ports are specific (not `any`)             | Specific ports limit evaluation to relevant services only           |
-| `multi_content`       | -5     | 3+ content matches                              | Multiple patterns must all match, greatly reducing coincidences     |
-| `has_threshold`       | -5     | Uses `threshold` or `detection_filter`          | Rate-limiting suppresses repeated alerts from noisy matches         |
+| ID                           | Weight | Condition                                      | Reasoning                                                            |
+|------------------------------|--------|------------------------------------------------|----------------------------------------------------------------------|
+| `broad_network_scope`        | +10    | Both src and dst addresses are `any`           | Monitoring all traffic in both directions maximises false matches    |
+| `single_content_http_method` | +8     | Only content is a common HTTP method (plugin)  | GET/POST alone matches virtually all HTTP traffic                    |
+| `few_content_matches`        | +8     | Single content match under 5 bytes (plugin)    | A short, single pattern is likely to collide with benign traffic     |
+| `pcre_only`                  | +7     | PCRE-only detection, no content anchor         | Regex-only rules are slow and prone to partial/accidental matches    |
+| `any_ports`                  | +5     | Both src and dst ports are `any`               | No port restriction means every connection is evaluated              |
+| `generic_protocol`           | +5     | `ip`/`tcp` with no app-layer keywords (plugin) | Without app-layer narrowing the rule matches raw transport traffic   |
+| `no_flow_state`              | +5     | No `flow` keyword                              | Without flow state the rule fires on every packet, not just sessions |
+| `bidirectional_fp`           | +5     | Direction is `<>` instead of `->`              | Evaluating both directions doubles the volume of inspected packets   |
+| `specific_tls_match`         | -10    | Matches specific TLS/cert/JA3/JA4 attributes   | Cryptographic fingerprints rarely appear in legitimate traffic       |
+| `flowbits_isset`             | -8     | Uses `flowbits:isset` (plugin)                 | Requires a prior rule to match first — two-stage AND logic           |
+| `specific_dns_query`         | -8     | Matches specific DNS query                     | Exact domain matches are unlikely to collide with normal lookups     |
+| `positioned_content`         | -5     | Uses depth/offset/distance/within              | Position-constrained content dramatically reduces coincidental hits  |
+| `byte_operations_precision`  | -5     | Uses byte_test/byte_jump/byte_extract          | Byte-level validation virtually never matches benign traffic         |
+| `tight_port_scope`           | -5     | Both ports are specific (not `any`)            | Specific ports limit evaluation to relevant services only            |
+| `multi_content`              | -5     | 3+ content matches                             | Multiple patterns must all match, greatly reducing coincidences      |
+| `has_threshold`              | -5     | Uses `threshold` or `detection_filter`         | Rate-limiting suppresses repeated alerts from noisy matches          |
+| `ip_ioc_fp`                  | -5     | Targets a specific literal IP (plugin)         | Literal IP match has near-zero false-positive risk                   |
+| `dsize_constraint`           | -3     | Uses `dsize` keyword                           | Size constraints eliminate matches on wrong-sized packets            |
+| `has_bsize`                  | -3     | Uses `bsize` keyword                           | Buffer size constraints reduce coincidental matches on normal data   |
 
 ## Custom Scoring Profiles
 
@@ -227,8 +242,8 @@ def my_plugin(rule):
 
 Register via YAML (`callable: "my_module:my_plugin"`) or programmatically (`scorer.register_plugin("id", my_plugin)`).
 
-Five built-in plugins ship with the default profile: `tiny_payload`, `few_content_matches`, `ip_ioc_rule`, `rule_age`,
-and `generic_protocol`.
+Eight built-in plugins ship with the default profile: `tiny_payload`, `few_content_matches`, `ip_ioc_rule`, `rule_age`,
+`generic_protocol`, `flowbits_isset`, `ip_ioc_fp`, and `single_content_http_method`.
 
 ## CLI Reference
 

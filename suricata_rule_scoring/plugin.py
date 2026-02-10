@@ -338,6 +338,72 @@ def builtin_rule_age(rule: SuricataRule) -> ScoringResult | None:
     )
 
 
+HTTP_METHODS = frozenset({"GET", "POST", "HEAD", "PUT", "DELETE", "CONNECT", "OPTIONS", "PATCH"})
+
+
+def builtin_flowbits_isset(rule: SuricataRule) -> ScoringResult | None:
+    """Check if rule requires flowbits:isset (multi-stage detection).
+
+    False-positive dimension, weight -8.
+    A rule with flowbits:isset only fires after another rule has already
+    matched on the same flow, effectively requiring two independent conditions.
+    """
+    flowbits = rule.options.other_options.get("flowbits")
+    if flowbits is None:
+        return None
+
+    # Handle both single value (str) and potential list
+    values = flowbits if isinstance(flowbits, list) else [flowbits]
+    for v in values:
+        if isinstance(v, str) and v.strip().startswith("isset"):
+            return ScoringResult(
+                dimension="false_positive",
+                delta=-8,
+                reason="Rule requires flowbits:isset (multi-stage correlated detection)",
+            )
+    return None
+
+
+def builtin_ip_ioc_fp(rule: SuricataRule) -> ScoringResult | None:
+    """Check if rule targets a specific literal IP address (low FP from IP match).
+
+    False-positive dimension, weight -5.
+    A rule matching a specific literal IP has near-zero false-positive risk
+    from the IP match itself.
+    """
+    has_specific_ip = any(_is_literal(ip) for ip in (rule.header.source_ip, rule.header.dest_ip))
+    if not has_specific_ip:
+        return None
+
+    return ScoringResult(
+        dimension="false_positive",
+        delta=-5,
+        reason="Rule targets specific IP address (near-zero FP risk from IP match)",
+    )
+
+
+def builtin_single_content_http_method(rule: SuricataRule) -> ScoringResult | None:
+    """Check if rule's only content matches are common HTTP methods.
+
+    False-positive dimension, weight +8.
+    A rule matching only GET/POST/etc. with no other content will fire
+    on virtually all HTTP traffic.
+    """
+    contents = rule.options.content
+    if not contents:
+        return None
+
+    for c in contents:
+        if c.strip().upper() not in HTTP_METHODS:
+            return None
+
+    return ScoringResult(
+        dimension="false_positive",
+        delta=8,
+        reason="Rule only matches common HTTP method(s) with no additional content patterns",
+    )
+
+
 def builtin_generic_protocol(rule: SuricataRule) -> ScoringResult | None:
     """Check if protocol is ip or tcp with no app-layer narrowing.
 

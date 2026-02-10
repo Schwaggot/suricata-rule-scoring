@@ -185,6 +185,88 @@ criteria:
 
   # tiny_payload — requires built-in plugin (see plugins section below)
 
+  - id: content_position_modifiers
+    name: "Content position modifiers"
+    description: "Rule uses depth, offset, distance, or within to constrain content matching"
+    dimension: quality
+    weight: 5
+    condition:
+      operator: "any"
+      conditions:
+        - field: "options.depth"
+          operator: "exists"
+        - field: "options.offset"
+          operator: "exists"
+        - field: "options.distance"
+          operator: "exists"
+        - field: "options.within"
+          operator: "exists"
+
+  - id: has_flowbits
+    name: "Uses flowbits"
+    description: "Rule uses flowbits for multi-stage/correlated detection"
+    dimension: quality
+    weight: 5
+    condition:
+      field: "options.flowbits"
+      operator: "exists"
+
+  - id: has_byte_operations
+    name: "Byte-level operations"
+    description: "Rule uses byte_test, byte_jump, or byte_extract for precise binary parsing"
+    dimension: quality
+    weight: 8
+    condition:
+      operator: "any"
+      conditions:
+        - field: "options.byte_test"
+          operator: "exists"
+        - field: "options.byte_jump"
+          operator: "exists"
+        - field: "options.byte_extract"
+          operator: "exists"
+
+  - id: has_dsize
+    name: "Has dsize constraint"
+    description: "Rule constrains payload size with dsize keyword"
+    dimension: quality
+    weight: 3
+    condition:
+      field: "options.dsize"
+      operator: "exists"
+
+  - id: content_anchoring
+    name: "Content anchoring"
+    description: "Rule uses startswith or endswith to anchor content in sticky buffers"
+    dimension: quality
+    weight: 3
+    condition:
+      operator: "any"
+      conditions:
+        - field: "options.startswith"
+          operator: "exists"
+        - field: "options.endswith"
+          operator: "exists"
+
+  - id: has_isdataat
+    name: "Has isdataat check"
+    description: "Rule verifies data exists at a given offset before matching"
+    dimension: quality
+    weight: 2
+    condition:
+      field: "options.isdataat"
+      operator: "exists"
+
+  - id: bidirectional_rule
+    name: "Bidirectional rule"
+    description: "Rule uses <> direction, doubling evaluation cost and indicating imprecision"
+    dimension: quality
+    weight: -5
+    condition:
+      field: "direction"
+      operator: "eq"
+      value: "<>"
+
   - id: any_any_source
     name: "Source is any/any"
     description: "Source address and port are both any"
@@ -363,6 +445,70 @@ criteria:
         - field: "options.detection_filter"
           operator: "exists"
 
+  - id: positioned_content
+    name: "Position-constrained content"
+    description: "Content matching constrained by depth/offset/distance/within (lower FP)"
+    dimension: false_positive
+    weight: -5
+    condition:
+      operator: "any"
+      conditions:
+        - field: "options.depth"
+          operator: "exists"
+        - field: "options.offset"
+          operator: "exists"
+        - field: "options.distance"
+          operator: "exists"
+        - field: "options.within"
+          operator: "exists"
+
+  - id: byte_operations_precision
+    name: "Byte-level precision"
+    description: "Byte operations (byte_test/byte_jump/byte_extract) provide precise matching"
+    dimension: false_positive
+    weight: -5
+    condition:
+      operator: "any"
+      conditions:
+        - field: "options.byte_test"
+          operator: "exists"
+        - field: "options.byte_jump"
+          operator: "exists"
+        - field: "options.byte_extract"
+          operator: "exists"
+
+  - id: dsize_constraint
+    name: "Payload size constraint"
+    description: "dsize constrains packet size, reducing coincidental matches"
+    dimension: false_positive
+    weight: -3
+    condition:
+      field: "options.dsize"
+      operator: "exists"
+
+  - id: has_bsize
+    name: "Buffer size constraint"
+    description: "bsize constrains sticky buffer size, reducing coincidental matches"
+    dimension: false_positive
+    weight: -3
+    condition:
+      field: "options.bsize"
+      operator: "exists"
+
+  - id: bidirectional_fp
+    name: "Bidirectional FP risk"
+    description: "Bidirectional rule evaluates both directions, increasing FP chance"
+    dimension: false_positive
+    weight: 5
+    condition:
+      field: "direction"
+      operator: "eq"
+      value: "<>"
+
+  # flowbits_isset — requires built-in plugin (inspects flowbits value)
+  # ip_ioc_fp — requires built-in plugin (extends IP IoC check to FP dimension)
+  # single_content_http_method — requires built-in plugin (inspects content values)
+
 plugins:
   - id: tiny_payload
     name: "Tiny payload match"
@@ -383,3 +529,15 @@ plugins:
   - id: generic_protocol
     name: "Generic protocol"
     callable: "suricata_rule_scoring.plugin:builtin_generic_protocol"
+
+  - id: flowbits_isset
+    name: "Flowbits isset (multi-stage)"
+    callable: "suricata_rule_scoring.plugin:builtin_flowbits_isset"
+
+  - id: ip_ioc_fp
+    name: "IP IoC (low FP)"
+    callable: "suricata_rule_scoring.plugin:builtin_ip_ioc_fp"
+
+  - id: single_content_http_method
+    name: "Single content HTTP method"
+    callable: "suricata_rule_scoring.plugin:builtin_single_content_http_method"

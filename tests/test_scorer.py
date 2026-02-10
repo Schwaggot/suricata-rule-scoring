@@ -124,3 +124,129 @@ class TestRuleScorer:
         result = scorer.score(high_quality_rule)
         ids = {c.criterion_id for c in result.matched_criteria}
         assert "bad" not in ids
+
+    def test_content_position_modifiers(self, scorer):
+        """Rule with depth/offset should get quality bonus and FP reduction."""
+        rule = parse_rule(
+            'alert tcp $HOME_NET any -> $EXTERNAL_NET 80 '
+            '(msg:"Positioned content"; content:"GET"; depth:3; offset:0; '
+            'flow:established,to_server; sid:3000001; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "content_position_modifiers" in ids
+        assert "positioned_content" in ids
+
+    def test_has_flowbits(self, scorer):
+        """Rule with flowbits should get quality bonus."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Flowbits"; flowbits:set,ET.test; content:"test"; '
+            'flow:established; sid:3000002; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "has_flowbits" in ids
+
+    def test_has_byte_operations(self, scorer):
+        """Rule with byte_test should get quality bonus and FP reduction."""
+        rule = parse_rule(
+            'alert tcp $HOME_NET any -> $EXTERNAL_NET any '
+            '(msg:"Byte test"; content:"|00 01|"; byte_test:2,=,0x0100,0; '
+            'flow:established; sid:3000003; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "has_byte_operations" in ids
+        assert "byte_operations_precision" in ids
+
+    def test_has_dsize(self, scorer):
+        """Rule with dsize should get quality bonus and FP reduction."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Dsize"; content:"test"; dsize:>100; '
+            'flow:established; sid:3000004; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "has_dsize" in ids
+        assert "dsize_constraint" in ids
+
+    def test_content_anchoring(self, scorer):
+        """Rule with endswith should get quality bonus."""
+        rule = parse_rule(
+            'alert dns any any -> any any '
+            '(msg:"DNS anchored"; dns.query; content:".evil.com"; endswith; '
+            'sid:3000005; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "content_anchoring" in ids
+
+    def test_bidirectional_rule(self, scorer):
+        """Bidirectional rule should get quality penalty and FP increase."""
+        rule = parse_rule(
+            'alert tcp any any <> any any '
+            '(msg:"Bidir"; content:"test"; flow:established; '
+            'sid:3000006; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "bidirectional_rule" in ids
+        assert "bidirectional_fp" in ids
+
+    def test_has_bsize(self, scorer):
+        """Rule with bsize should get FP reduction."""
+        rule = parse_rule(
+            'alert http any any -> any any '
+            '(msg:"Bsize"; content:"test"; http.uri; bsize:>200; '
+            'flow:established,to_server; sid:3000007; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "has_bsize" in ids
+
+    def test_flowbits_isset_plugin(self, scorer):
+        """Rule with flowbits:isset should get FP reduction via plugin."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Flowbits isset"; flowbits:isset,ET.test; '
+            'content:"evil"; flow:established; sid:3000008; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "flowbits_isset" in ids
+
+    def test_ip_ioc_fp_plugin(self, scorer):
+        """Rule with specific IP should get FP reduction via plugin."""
+        rule = parse_rule(
+            'alert tcp $HOME_NET any -> [91.99.89.71] 443 '
+            '(msg:"IP IoC"; sid:3000009; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "ip_ioc_fp" in ids
+        # Should also have the quality plugin
+        assert "ip_ioc_rule" in ids
+
+    def test_single_content_http_method_plugin(self, scorer):
+        """Rule with only GET content should get FP increase via plugin."""
+        rule = parse_rule(
+            'alert http any any -> any any '
+            '(msg:"GET only"; content:"GET"; http_method; '
+            'flow:established,to_server; sid:3000010; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "single_content_http_method" in ids
+
+    def test_has_isdataat(self, scorer):
+        """Rule with isdataat should get quality bonus."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Isdataat"; content:"test"; isdataat:50; '
+            'flow:established; sid:3000011; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "has_isdataat" in ids
