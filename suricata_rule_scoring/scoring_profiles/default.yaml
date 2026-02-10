@@ -35,13 +35,13 @@ criteria:
 
   - id: specific_protocol
     name: "Specific protocol"
-    description: "Protocol is not ip (i.e., narrows to tcp/udp/http/tls/etc.)"
+    description: "Protocol is app-layer specific (not ip/tcp/udp)"
     dimension: quality
     weight: 5
     condition:
       field: "protocol"
-      operator: "neq"
-      value: "ip"
+      operator: "not_in"
+      value: ["ip", "tcp", "udp"]
 
   - id: has_flow_direction
     name: "Has flow keyword"

@@ -405,12 +405,12 @@ def builtin_single_content_http_method(rule: SuricataRule) -> ScoringResult | No
 
 
 def builtin_generic_protocol(rule: SuricataRule) -> ScoringResult | None:
-    """Check if protocol is ip or tcp with no app-layer narrowing.
+    """Check if protocol is ip/tcp/udp with no app-layer narrowing.
 
     False-positive dimension, weight +5.
     """
     protocol = rule.header.protocol.lower()
-    if protocol not in ("ip", "tcp"):
+    if protocol not in ("ip", "tcp", "udp"):
         return None
 
     # Check if any app-layer keyword is used in other_options
