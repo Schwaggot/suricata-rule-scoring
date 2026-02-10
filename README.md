@@ -132,7 +132,7 @@ points.
 | `generic_protocol`           | +5     | ip/tcp/udp/tcp-pkt/tcp-stream with no app-layer keywords (plugin) | Without app-layer narrowing the rule matches raw transport traffic   |
 | `no_flow_state`              | +3     | No `flow` keyword                                                 | Without flow state the rule fires on every packet, not just sessions |
 | `bidirectional_fp`           | +5     | Direction is `<>` instead of `->`                                 | Evaluating both directions doubles the volume of inspected packets   |
-| `long_content_match`         | -10    | Total content >= 10 bytes (plugin)                                | Long unique content has near-zero chance of matching benign traffic  |
+| `long_content_match`         | -5/-10 | 5-9 bytes: -5, 10+ bytes: -10 (plugin)                            | Match probability drops exponentially with content length            |
 | `specific_tls_match`         | -10    | Matches specific TLS/cert/JA3/JA4 attributes                      | Cryptographic fingerprints rarely appear in legitimate traffic       |
 | `flowbits_isset`             | -8     | Uses `flowbits:isset` (plugin)                                    | Requires a prior rule to match first — two-stage AND logic           |
 | `specific_dns_query`         | -8     | Matches specific DNS query                                        | Exact domain matches are unlikely to collide with normal lookups     |

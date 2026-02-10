@@ -45,7 +45,7 @@ class TestComputeContentBytes:
 
 
 class TestBuiltinLongContentMatch:
-    def test_long_content_triggers(self):
+    def test_10_plus_bytes_gives_minus_10(self):
         rule = parse_rule(
             'alert tcp any any -> any any '
             '(msg:"Long"; content:"aqlKZ7wjzg0iKM00E1WB"; '
@@ -56,20 +56,51 @@ class TestBuiltinLongContentMatch:
         assert result.dimension == "false_positive"
         assert result.delta == -10
 
-    def test_short_content_no_trigger(self):
+    def test_5_to_9_bytes_gives_minus_5(self):
         rule = parse_rule(
             'alert tcp any any -> any any '
-            '(msg:"Short"; content:"GET"; '
+            '(msg:"Medium"; content:"|09 22 33 30 28 35 2c|"; '
             'flow:established; sid:2; rev:1;)'
         )
         result = builtin_long_content_match(rule)
+        assert result is not None
+        assert result.dimension == "false_positive"
+        assert result.delta == -5
+
+    def test_under_5_bytes_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Short"; content:"GET"; '
+            'flow:established; sid:3; rev:1;)'
+        )
+        result = builtin_long_content_match(rule)
         assert result is None
+
+    def test_exactly_5_bytes_gives_minus_5(self):
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Exact 5"; content:"ABCDE"; '
+            'flow:established; sid:4; rev:1;)'
+        )
+        result = builtin_long_content_match(rule)
+        assert result is not None
+        assert result.delta == -5
+
+    def test_exactly_10_bytes_gives_minus_10(self):
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Exact 10"; content:"ABCDEFGHIJ"; '
+            'flow:established; sid:5; rev:1;)'
+        )
+        result = builtin_long_content_match(rule)
+        assert result is not None
+        assert result.delta == -10
 
     def test_multiple_contents_combined(self):
         rule = parse_rule(
             'alert tcp any any -> any 80 '
             '(msg:"Multi"; content:"1234567890"; content:"1234567890"; '
-            'flow:established; sid:3; rev:1;)'
+            'flow:established; sid:6; rev:1;)'
         )
         result = builtin_long_content_match(rule)
         assert result is not None
@@ -78,7 +109,7 @@ class TestBuiltinLongContentMatch:
     def test_no_content_no_trigger(self):
         rule = parse_rule(
             'alert tcp any any -> any any '
-            '(msg:"None"; sid:4; rev:1;)'
+            '(msg:"None"; sid:7; rev:1;)'
         )
         result = builtin_long_content_match(rule)
         assert result is None
@@ -87,10 +118,11 @@ class TestBuiltinLongContentMatch:
         rule = parse_rule(
             'alert tcp any any -> any any '
             '(msg:"Hex long"; content:"|554b30303736305337473130 554b30303736305337473130|"; '
-            'flow:established; sid:5; rev:1;)'
+            'flow:established; sid:8; rev:1;)'
         )
         result = builtin_long_content_match(rule)
         assert result is not None
+        assert result.delta == -10
 
 
 class TestBuiltinTinyPayload:

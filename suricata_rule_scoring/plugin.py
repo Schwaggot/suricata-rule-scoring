@@ -226,11 +226,16 @@ def builtin_tiny_payload(rule: SuricataRule) -> ScoringResult | None:
 
 
 def builtin_long_content_match(rule: SuricataRule) -> ScoringResult | None:
-    """Check if rule has 20+ bytes of total content matches.
+    """Graduated FP reduction based on total content byte length.
 
-    False-positive dimension, weight -10.
-    Long, unique content strings have near-zero chance of matching
-    benign traffic, even with broad network scope.
+    False-positive dimension.  The probability of a random match drops
+    exponentially with content length:
+
+      < 5 bytes  →   0  (neutral — still risky on structured traffic)
+      5-9 bytes  →  -5  (unlikely even against non-random data)
+      10+ bytes  → -10  (astronomically unlikely)
+
+    Content under 5 bytes is handled separately by few_content_matches.
     """
     contents = rule.options.content
     if not contents:
@@ -242,6 +247,12 @@ def builtin_long_content_match(rule: SuricataRule) -> ScoringResult | None:
             dimension="false_positive",
             delta=-10,
             reason=f"Rule matches {total_bytes} bytes of content (>= 10), highly specific",
+        )
+    if total_bytes >= 5:
+        return ScoringResult(
+            dimension="false_positive",
+            delta=-5,
+            reason=f"Rule matches {total_bytes} bytes of content (5-9), moderately specific",
         )
     return None
 
