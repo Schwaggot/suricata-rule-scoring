@@ -33,7 +33,7 @@ class TestLoadProfile:
         # Default profile has many criteria
         assert len(profile.criteria) >= 20
         # Has plugins configured
-        assert len(profile.plugins) == 8
+        assert len(profile.plugins) == 9
 
     def test_default_profile_criterion_ids(self):
         profile = load_default_profile()

@@ -477,11 +477,16 @@ criteria:
       operator: "eq"
       value: "<>"
 
+  # long_content_match — requires built-in plugin (computes total content bytes)
   # flowbits_isset — requires built-in plugin (inspects flowbits value)
   # ip_ioc_fp — requires built-in plugin (extends IP IoC check to FP dimension)
   # single_content_http_method — requires built-in plugin (inspects content values)
 
 plugins:
+  - id: long_content_match
+    name: "Long content match"
+    callable: "suricata_rule_scoring.plugin:builtin_long_content_match"
+
   - id: tiny_payload
     name: "Tiny payload match"
     callable: "suricata_rule_scoring.plugin:builtin_tiny_payload"

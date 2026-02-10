@@ -12,6 +12,7 @@ from suricata_rule_scoring.plugin import (
     builtin_generic_protocol,
     builtin_ip_ioc_fp,
     builtin_ip_ioc_rule,
+    builtin_long_content_match,
     builtin_rule_age,
     builtin_single_content_http_method,
     builtin_tiny_payload,
@@ -40,6 +41,55 @@ class TestComputeContentBytes:
     def test_multiple_hex_blocks(self):
         # "A" (1) + hex 00 01 (2) + "BC" (2) + hex FF (1) = 6
         assert compute_content_bytes("A|00 01|BC|FF|") == 6
+
+
+class TestBuiltinLongContentMatch:
+    def test_long_content_triggers(self):
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Long"; content:"aqlKZ7wjzg0iKM00E1WB"; '
+            'flow:established; sid:1; rev:1;)'
+        )
+        result = builtin_long_content_match(rule)
+        assert result is not None
+        assert result.dimension == "false_positive"
+        assert result.delta == -10
+
+    def test_short_content_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Short"; content:"GET"; '
+            'flow:established; sid:2; rev:1;)'
+        )
+        result = builtin_long_content_match(rule)
+        assert result is None
+
+    def test_multiple_contents_combined(self):
+        rule = parse_rule(
+            'alert tcp any any -> any 80 '
+            '(msg:"Multi"; content:"1234567890"; content:"1234567890"; '
+            'flow:established; sid:3; rev:1;)'
+        )
+        result = builtin_long_content_match(rule)
+        assert result is not None
+        assert result.delta == -10
+
+    def test_no_content_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"None"; sid:4; rev:1;)'
+        )
+        result = builtin_long_content_match(rule)
+        assert result is None
+
+    def test_hex_content_long(self):
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Hex long"; content:"|554b30303736305337473130 554b30303736305337473130|"; '
+            'flow:established; sid:5; rev:1;)'
+        )
+        result = builtin_long_content_match(rule)
+        assert result is not None
 
 
 class TestBuiltinTinyPayload:
