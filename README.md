@@ -105,11 +105,8 @@ points.
 | `has_flow_direction`         | +5       | Specifies `flow` keyword                      | Flow tracking ensures the rule fires at the right stage             |
 | `content_position_modifiers` | +5       | Uses depth/offset/distance/within             | Position-constrained content shows protocol structure awareness     |
 | `has_flowbits`               | +5       | Uses `flowbits` keyword                       | Flowbits implement multi-stage/correlated detection chains          |
-| `has_reference`              | +3       | Includes a reference (CVE, URL, etc.)         | References aid triage and link the rule to known threats            |
-| `has_classtype`              | +3       | Includes `classtype`                          | Classification enables priority-based alert handling                |
 | `has_dsize`                  | +3       | Uses `dsize` keyword                          | Payload size constraints improve performance and precision          |
 | `content_anchoring`          | +3       | Uses `startswith` or `endswith`               | Anchors content to buffer boundaries for precise matching           |
-| `has_metadata`               | +2       | Includes `metadata`                           | Metadata supports automated enrichment and filtering                |
 | `has_isdataat`               | +2       | Uses `isdataat` keyword                       | Verifies data exists at offset before matching proceeds             |
 | `tls_fingerprint`            | +15      | Matches TLS cert/JA3/JA4 fingerprint fields   | Cryptographic fingerprints are highly specific indicators           |
 | `has_byte_operations`        | +8       | Uses byte_test/byte_jump/byte_extract         | Byte-level operations represent surgical binary protocol parsing    |

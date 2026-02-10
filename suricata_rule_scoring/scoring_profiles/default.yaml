@@ -1,5 +1,4 @@
 # Default scoring profile for suricata-rule-scorer
-# Implements all 26 criteria from the PRD (sections 5.1 and 5.2)
 
 scoring:
   quality:
@@ -13,7 +12,7 @@ scoring:
 
 criteria:
   # =========================================
-  # Quality Criteria (PRD 5.1)
+  # Quality Criteria
   # =========================================
 
   - id: has_content_match
@@ -51,33 +50,6 @@ criteria:
     weight: 5
     condition:
       field: "options.flow"
-      operator: "exists"
-
-  - id: has_reference
-    name: "Has reference"
-    description: "Rule includes a reference (CVE, URL, etc.)"
-    dimension: quality
-    weight: 3
-    condition:
-      field: "options.reference"
-      operator: "exists"
-
-  - id: has_classtype
-    name: "Has classtype"
-    description: "Rule includes classtype metadata"
-    dimension: quality
-    weight: 3
-    condition:
-      field: "options.classtype"
-      operator: "exists"
-
-  - id: has_metadata
-    name: "Has metadata"
-    description: "Rule includes metadata keyword"
-    dimension: quality
-    weight: 2
-    condition:
-      field: "options.metadata"
       operator: "exists"
 
   - id: tls_fingerprint
@@ -298,7 +270,7 @@ criteria:
           value: "any"
 
   # =========================================
-  # False-Positive Criteria (PRD 5.2)
+  # False-Positive Criteria
   # =========================================
 
   - id: broad_network_scope
