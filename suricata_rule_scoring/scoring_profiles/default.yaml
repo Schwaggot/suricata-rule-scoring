@@ -142,7 +142,7 @@ criteria:
     name: "No content match"
     description: "Rule has zero content, pcre, or app-layer match keywords"
     dimension: quality
-    weight: -15
+    weight: -10
     condition:
       operator: "all"
       conditions:
@@ -371,6 +371,10 @@ plugins:
   - id: few_content_matches
     name: "Few content matches"
     callable: "suricata_rule_scoring.plugin:builtin_few_content_matches"
+
+  - id: ip_ioc_rule
+    name: "IP-based IoC rule"
+    callable: "suricata_rule_scoring.plugin:builtin_ip_ioc_rule"
 
   - id: generic_protocol
     name: "Generic protocol"

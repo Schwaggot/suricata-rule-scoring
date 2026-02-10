@@ -243,6 +243,35 @@ def builtin_few_content_matches(rule: SuricataRule) -> ScoringResult | None:
     return None
 
 
+def _is_literal(value: str) -> bool:
+    """Check if an IP or port value is a literal (not 'any' or a variable)."""
+    stripped = value.strip("[]").lstrip("!")
+    return stripped.lower() != "any" and not stripped.startswith("$")
+
+
+def builtin_ip_ioc_rule(rule: SuricataRule) -> ScoringResult | None:
+    """Check if rule targets a specific literal IP address (IoC-style detection).
+
+    Quality dimension, weight +10 for IP only, +15 for IP+port.
+    """
+    has_specific_ip = any(_is_literal(ip) for ip in (rule.header.source_ip, rule.header.dest_ip))
+    if not has_specific_ip:
+        return None
+
+    has_specific_port = any(_is_literal(p) for p in (rule.header.source_port, rule.header.dest_port))
+    if has_specific_port:
+        return ScoringResult(
+            dimension="quality",
+            delta=15,
+            reason="Rule targets specific IP address and port (IoC-style detection)",
+        )
+    return ScoringResult(
+        dimension="quality",
+        delta=10,
+        reason="Rule targets specific IP address (IoC-style detection)",
+    )
+
+
 def builtin_generic_protocol(rule: SuricataRule) -> ScoringResult | None:
     """Check if protocol is ip or tcp with no app-layer narrowing.
 

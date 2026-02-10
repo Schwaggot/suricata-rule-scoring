@@ -6,6 +6,7 @@ from suricata_rule_parser import parse_rule
 from suricata_rule_scoring.plugin import (
     builtin_few_content_matches,
     builtin_generic_protocol,
+    builtin_ip_ioc_rule,
     builtin_tiny_payload,
     compute_content_bytes,
     load_plugin,
@@ -130,6 +131,53 @@ class TestBuiltinGenericProtocol:
             'flow:established; sid:4; rev:1; classtype:misc-activity;)'
         )
         result = builtin_generic_protocol(rule)
+        assert result is None
+
+
+class TestBuiltinIpIocRule:
+    def test_specific_ip_and_port_gives_15(self):
+        rule = parse_rule(
+            'alert tcp $HOME_NET any -> [91.99.89.71] 443 '
+            '(msg:"ThreatFox IP"; sid:1; rev:1;)'
+        )
+        result = builtin_ip_ioc_rule(rule)
+        assert result is not None
+        assert result.dimension == "quality"
+        assert result.delta == 15
+
+    def test_specific_ip_any_port_gives_10(self):
+        rule = parse_rule(
+            'alert tcp 10.0.0.1 any -> any any '
+            '(msg:"Source IP"; sid:2; rev:1;)'
+        )
+        result = builtin_ip_ioc_rule(rule)
+        assert result is not None
+        assert result.dimension == "quality"
+        assert result.delta == 10
+
+    def test_bracketed_ip_group_with_port(self):
+        rule = parse_rule(
+            'alert tcp $HOME_NET any -> [10.0.0.1,10.0.0.2] 443 '
+            '(msg:"IP group"; sid:3; rev:1;)'
+        )
+        result = builtin_ip_ioc_rule(rule)
+        assert result is not None
+        assert result.delta == 15
+
+    def test_any_both_sides_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp any any -> any 80 '
+            '(msg:"Any"; sid:4; rev:1;)'
+        )
+        result = builtin_ip_ioc_rule(rule)
+        assert result is None
+
+    def test_variables_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp $HOME_NET any -> $EXTERNAL_NET 443 '
+            '(msg:"Vars"; sid:5; rev:1;)'
+        )
+        result = builtin_ip_ioc_rule(rule)
         assert result is None
 
 

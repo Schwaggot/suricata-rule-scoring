@@ -97,22 +97,23 @@ points.
 
 ### Default Quality Criteria
 
-| ID                     | Weight | Condition                                   |
-|------------------------|--------|---------------------------------------------|
-| `has_content_match`    | +10    | Has at least one `content` keyword          |
-| `has_fast_pattern`     | +5     | Uses `fast_pattern`                         |
-| `specific_protocol`    | +5     | Protocol is not `ip`                        |
-| `has_flow_direction`   | +5     | Specifies `flow` keyword                    |
-| `has_reference`        | +3     | Includes a reference (CVE, URL, etc.)       |
-| `has_classtype`        | +3     | Includes `classtype`                        |
-| `has_metadata`         | +2     | Includes `metadata`                         |
-| `tls_fingerprint`      | +15    | Matches TLS cert/JA3/JA4 fingerprint fields |
-| `deep_content`         | +8     | 3+ content matches                          |
-| `pcre_without_content` | -10    | PCRE with no content anchor                 |
-| `no_content_match`     | -15    | No content, pcre, or app-layer match        |
-| `tiny_payload`         | -10    | Matches fewer than 3 bytes total (plugin)   |
-| `any_any_source`       | -3     | Source address and port are both `any`      |
-| `any_any_dest`         | -3     | Destination address and port are both `any` |
+| ID                     | Weight  | Condition                                     |
+|------------------------|---------|-----------------------------------------------|
+| `has_content_match`    | +10     | Has at least one `content` keyword            |
+| `has_fast_pattern`     | +5      | Uses `fast_pattern`                           |
+| `specific_protocol`    | +5      | Protocol is not `ip`                          |
+| `has_flow_direction`   | +5      | Specifies `flow` keyword                      |
+| `has_reference`        | +3      | Includes a reference (CVE, URL, etc.)         |
+| `has_classtype`        | +3      | Includes `classtype`                          |
+| `has_metadata`         | +2      | Includes `metadata`                           |
+| `tls_fingerprint`      | +15     | Matches TLS cert/JA3/JA4 fingerprint fields   |
+| `deep_content`         | +8      | 3+ content matches                            |
+| `pcre_without_content` | -10     | PCRE with no content anchor                   |
+| `no_content_match`     | -10     | No content, pcre, or app-layer match          |
+| `ip_ioc_rule`          | +10/+15 | Targets a specific IP; +15 with port (plugin) |
+| `tiny_payload`         | -10     | Matches fewer than 3 bytes total (plugin)     |
+| `any_any_source`       | -3      | Source address and port are both `any`        |
+| `any_any_dest`         | -3      | Destination address and port are both `any`   |
 
 ### Default False-Positive Criteria
 
@@ -225,7 +226,8 @@ def my_plugin(rule):
 
 Register via YAML (`callable: "my_module:my_plugin"`) or programmatically (`scorer.register_plugin("id", my_plugin)`).
 
-Three built-in plugins ship with the default profile: `tiny_payload`, `few_content_matches`, and `generic_protocol`.
+Four built-in plugins ship with the default profile: `tiny_payload`, `few_content_matches`, `generic_protocol`, and
+`ip_ioc_rule`.
 
 ## CLI Reference
 
