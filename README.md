@@ -111,7 +111,6 @@ points.
 | `pcre_without_content` | -10    | PCRE with no content anchor                 |
 | `no_content_match`     | -15    | No content, pcre, or app-layer match        |
 | `tiny_payload`         | -10    | Matches fewer than 3 bytes total (plugin)   |
-| `missing_sid_or_rev`   | -5     | Lacks `sid` or `rev`                        |
 | `any_any_source`       | -3     | Source address and port are both `any`      |
 | `any_any_dest`         | -3     | Destination address and port are both `any` |
 

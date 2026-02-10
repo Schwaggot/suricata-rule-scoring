@@ -185,23 +185,6 @@ criteria:
 
   # tiny_payload — requires built-in plugin (see plugins section below)
 
-  - id: missing_sid_or_rev
-    name: "Missing SID or revision"
-    description: "Rule lacks sid or rev"
-    dimension: quality
-    weight: -5
-    condition:
-      operator: "any"
-      conditions:
-        - operator: "not"
-          condition:
-            field: "options.sid"
-            operator: "exists"
-        - operator: "not"
-          condition:
-            field: "options.rev"
-            operator: "exists"
-
   - id: any_any_source
     name: "Source is any/any"
     description: "Source address and port are both any"
