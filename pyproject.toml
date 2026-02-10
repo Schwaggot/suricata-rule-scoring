@@ -31,6 +31,11 @@ dependencies = [
     "pyyaml>=6.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
 [project.scripts]
 suricata-rule-scorer = "suricata_rule_scoring.cli:main"
 
