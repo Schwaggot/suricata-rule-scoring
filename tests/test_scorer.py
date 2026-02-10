@@ -250,3 +250,61 @@ class TestRuleScorer:
         result = scorer.score(rule)
         ids = {c.criterion_id for c in result.matched_criteria}
         assert "has_isdataat" in ids
+
+    def test_null_heavy_content_plugin(self, scorer):
+        """Rule with mostly null content should get FP penalty via plugin."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Null heavy"; content:"|00 00 00 00 00 00 00 00 00 00 00 00 00 00 DE AD|"; '
+            'flow:established; sid:4000001; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "null_heavy_content" in ids
+
+    def test_weak_multi_content_plugin(self, scorer):
+        """Rule with all tiny content matches should get FP penalty via plugin."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Weak multi"; content:"|22|"; content:"|00|"; content:"|5c|"; '
+            'flow:established; sid:4000002; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "weak_multi_content" in ids
+
+    def test_informational_severity_criterion(self, scorer):
+        """Rule with signature_severity Informational should get FP penalty."""
+        rule = parse_rule(
+            'alert udp any any -> any any '
+            '(msg:"Informational"; content:"test"; '
+            'metadata: signature_severity Informational; '
+            'flow:established; sid:4000003; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "informational_severity" in ids
+
+    def test_low_confidence_criterion(self, scorer):
+        """Rule with confidence Low should get FP penalty."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Low conf"; content:"test"; '
+            'metadata: confidence Low; '
+            'flow:established; sid:4000004; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "low_confidence" in ids
+
+    def test_info_classtype_criterion(self, scorer):
+        """Rule with classtype misc-activity should get FP penalty."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Misc"; content:"test"; '
+            'classtype:misc-activity; '
+            'flow:established; sid:4000005; rev:1;)'
+        )
+        result = scorer.score(rule)
+        ids = {c.criterion_id for c in result.matched_criteria}
+        assert "info_classtype" in ids

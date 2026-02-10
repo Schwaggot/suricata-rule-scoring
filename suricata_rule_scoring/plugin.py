@@ -206,6 +206,24 @@ def compute_content_bytes(content_str: str) -> int:
     return total
 
 
+def compute_content_null_bytes(content_str: str) -> int:
+    """Count the number of |00| (null) bytes in a content string.
+
+    Only counts hex 00 bytes inside |...| blocks; literal ASCII NUL is not
+    expected in Suricata rule content strings.
+    """
+    total = 0
+    parts = re.split(r"\|([^|]*)\|", content_str)
+    for i, part in enumerate(parts):
+        if i % 2 == 1:
+            # Hex block: count 00 byte pairs
+            hex_str = part.strip().replace(" ", "")
+            for j in range(0, len(hex_str) - 1, 2):
+                if hex_str[j:j + 2] == "00":
+                    total += 1
+    return total
+
+
 def builtin_tiny_payload(rule: SuricataRule) -> ScoringResult | None:
     """Check if rule matches fewer than 3 bytes of payload total.
 
@@ -226,14 +244,16 @@ def builtin_tiny_payload(rule: SuricataRule) -> ScoringResult | None:
 
 
 def builtin_long_content_match(rule: SuricataRule) -> ScoringResult | None:
-    """Graduated FP reduction based on total content byte length.
+    """Graduated FP reduction based on effective content byte length.
 
-    False-positive dimension.  The probability of a random match drops
-    exponentially with content length:
+    False-positive dimension.  Null bytes (|00|) are discounted because
+    they appear in virtually all binary protocols and add no selectivity.
 
-      < 5 bytes  →   0  (neutral — still risky on structured traffic)
-      5-9 bytes  →  -5  (unlikely even against non-random data)
-      10+ bytes  → -10  (astronomically unlikely)
+    Effective bytes = total_bytes - null_bytes.
+
+      < 5 effective  →   0  (neutral — still risky on structured traffic)
+      5-9 effective  →  -5  (unlikely even against non-random data)
+      10+ effective  → -10  (astronomically unlikely)
 
     Content under 5 bytes is handled separately by few_content_matches.
     """
@@ -242,17 +262,20 @@ def builtin_long_content_match(rule: SuricataRule) -> ScoringResult | None:
         return None
 
     total_bytes = sum(compute_content_bytes(c) for c in contents)
-    if total_bytes >= 10:
+    null_bytes = sum(compute_content_null_bytes(c) for c in contents)
+    effective_bytes = total_bytes - null_bytes
+
+    if effective_bytes >= 10:
         return ScoringResult(
             dimension="false_positive",
             delta=-10,
-            reason=f"Rule matches {total_bytes} bytes of content (>= 10), highly specific",
+            reason=f"Rule matches {effective_bytes} effective bytes of content (>= 10), highly specific",
         )
-    if total_bytes >= 5:
+    if effective_bytes >= 5:
         return ScoringResult(
             dimension="false_positive",
             delta=-5,
-            reason=f"Rule matches {total_bytes} bytes of content (5-9), moderately specific",
+            reason=f"Rule matches {effective_bytes} effective bytes of content (5-9), moderately specific",
         )
     return None
 
@@ -502,4 +525,51 @@ def builtin_generic_protocol(rule: SuricataRule) -> ScoringResult | None:
         dimension="false_positive",
         delta=5,
         reason=f"Generic protocol '{protocol}' with no app-layer keyword narrowing",
+    )
+
+
+def builtin_null_heavy_content(rule: SuricataRule) -> ScoringResult | None:
+    """Penalise rules where >50% of content bytes are null (|00|).
+
+    False-positive dimension, weight +5.
+    Null-padded content is common in binary protocols and provides
+    very little selectivity.
+    """
+    contents = rule.options.content
+    if not contents:
+        return None
+
+    total_bytes = sum(compute_content_bytes(c) for c in contents)
+    if total_bytes == 0:
+        return None
+
+    null_bytes = sum(compute_content_null_bytes(c) for c in contents)
+    if null_bytes > total_bytes / 2:
+        return ScoringResult(
+            dimension="false_positive",
+            delta=5,
+            reason=f"Content is {null_bytes}/{total_bytes} null bytes ({100 * null_bytes // total_bytes}%), low selectivity",
+        )
+    return None
+
+
+def builtin_weak_multi_content(rule: SuricataRule) -> ScoringResult | None:
+    """Penalise rules with 2+ content matches where every match is <= 2 bytes.
+
+    False-positive dimension, weight +10.
+    Multiple tiny content matches look like multi_content (-5) but
+    each individual match is too short to be selective.
+    """
+    contents = rule.options.content
+    if not contents or len(contents) < 2:
+        return None
+
+    for c in contents:
+        if compute_content_bytes(c) > 2:
+            return None
+
+    return ScoringResult(
+        dimension="false_positive",
+        delta=10,
+        reason=f"All {len(contents)} content matches are <= 2 bytes each, individually non-selective",
     )

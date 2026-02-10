@@ -484,10 +484,42 @@ criteria:
       operator: "eq"
       value: "<>"
 
+  - id: informational_severity
+    name: "Informational severity"
+    description: "Metadata signature_severity is Informational — often advisory, high FP risk"
+    dimension: false_positive
+    weight: 5
+    condition:
+      field: "options.metadata.signature_severity"
+      operator: "eq"
+      value: "Informational"
+
+  - id: low_confidence
+    name: "Low confidence"
+    description: "Metadata confidence is Low — rule author flagged uncertainty"
+    dimension: false_positive
+    weight: 3
+    condition:
+      field: "options.metadata.confidence"
+      operator: "eq"
+      value: "Low"
+
+  - id: info_classtype
+    name: "Informational classtype"
+    description: "Classtype indicates non-malicious or policy activity"
+    dimension: false_positive
+    weight: 3
+    condition:
+      field: "options.classtype"
+      operator: "in"
+      value: ["misc-activity", "not-suspicious", "policy-violation"]
+
   # long_content_match — requires built-in plugin (computes total content bytes)
   # flowbits_isset — requires built-in plugin (inspects flowbits value)
   # ip_ioc_fp — requires built-in plugin (extends IP IoC check to FP dimension)
   # single_content_http_method — requires built-in plugin (inspects content values)
+  # null_heavy_content — requires built-in plugin (inspects content hex bytes)
+  # weak_multi_content — requires built-in plugin (inspects individual content lengths)
 
 plugins:
   - id: long_content_match
@@ -529,3 +561,11 @@ plugins:
   - id: port_specificity
     name: "Port specificity"
     callable: "suricata_rule_scoring.plugin:builtin_port_specificity"
+
+  - id: null_heavy_content
+    name: "Null-heavy content"
+    callable: "suricata_rule_scoring.plugin:builtin_null_heavy_content"
+
+  - id: weak_multi_content
+    name: "Weak multi-content"
+    callable: "suricata_rule_scoring.plugin:builtin_weak_multi_content"

@@ -13,11 +13,14 @@ from suricata_rule_scoring.plugin import (
     builtin_ip_ioc_fp,
     builtin_ip_ioc_rule,
     builtin_long_content_match,
+    builtin_null_heavy_content,
     builtin_port_specificity,
     builtin_rule_age,
     builtin_single_content_http_method,
     builtin_tiny_payload,
+    builtin_weak_multi_content,
     compute_content_bytes,
+    compute_content_null_bytes,
     load_plugin,
 )
 
@@ -42,6 +45,32 @@ class TestComputeContentBytes:
     def test_multiple_hex_blocks(self):
         # "A" (1) + hex 00 01 (2) + "BC" (2) + hex FF (1) = 6
         assert compute_content_bytes("A|00 01|BC|FF|") == 6
+
+
+class TestComputeContentNullBytes:
+    def test_no_null_bytes(self):
+        assert compute_content_null_bytes("GET") == 0
+
+    def test_all_null_bytes(self):
+        assert compute_content_null_bytes("|00 00 00|") == 3
+
+    def test_mixed_hex(self):
+        # |DE 00 AD 00| has 2 null bytes
+        assert compute_content_null_bytes("|DE 00 AD 00|") == 2
+
+    def test_literal_and_hex(self):
+        # "AB" (0 nulls) + |00| (1 null) = 1
+        assert compute_content_null_bytes("AB|00|") == 1
+
+    def test_empty(self):
+        assert compute_content_null_bytes("") == 0
+
+    def test_concatenated_hex(self):
+        # |0000FF00| = 00, 00, FF, 00 → 3 null bytes
+        assert compute_content_null_bytes("|0000FF00|") == 3
+
+    def test_no_hex_blocks(self):
+        assert compute_content_null_bytes("Hello World") == 0
 
 
 class TestBuiltinLongContentMatch:
@@ -519,6 +548,134 @@ class TestBuiltinSingleContentHttpMethod:
             'flow:established,to_server; sid:5; rev:1;)'
         )
         result = builtin_single_content_http_method(rule)
+        assert result is None
+
+
+class TestBuiltinLongContentMatchNullDiscount:
+    def test_null_heavy_content_discounted(self):
+        """16 bytes total but 14 null → 2 effective → no reward."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Null heavy"; content:"|00 00 00 00 00 00 00 00 00 00 00 00 00 00 DE AD|"; '
+            'flow:established; sid:100; rev:1;)'
+        )
+        result = builtin_long_content_match(rule)
+        assert result is None  # 2 effective bytes < 5
+
+    def test_mixed_null_still_rewards(self):
+        """10 bytes total, 3 null → 7 effective → -5 reward."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Mixed"; content:"|00 00 00|ABCDEFG"; '
+            'flow:established; sid:101; rev:1;)'
+        )
+        result = builtin_long_content_match(rule)
+        assert result is not None
+        assert result.delta == -5
+
+    def test_no_null_bytes_unchanged(self):
+        """Pure ASCII 10+ bytes still gets -10."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Clean"; content:"ABCDEFGHIJ"; '
+            'flow:established; sid:102; rev:1;)'
+        )
+        result = builtin_long_content_match(rule)
+        assert result is not None
+        assert result.delta == -10
+
+
+class TestBuiltinNullHeavyContent:
+    def test_mostly_null_triggers(self):
+        """14/16 null bytes → 87.5% → triggers +5."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Null heavy"; content:"|00 00 00 00 00 00 00 00 00 00 00 00 00 00 DE AD|"; '
+            'flow:established; sid:200; rev:1;)'
+        )
+        result = builtin_null_heavy_content(rule)
+        assert result is not None
+        assert result.dimension == "false_positive"
+        assert result.delta == 5
+
+    def test_exactly_half_no_trigger(self):
+        """2/4 null = 50% — not strictly greater than 50%."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Half"; content:"|00 00 DE AD|"; '
+            'flow:established; sid:201; rev:1;)'
+        )
+        result = builtin_null_heavy_content(rule)
+        assert result is None
+
+    def test_no_null_bytes_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Clean"; content:"ABCDEFGHIJ"; '
+            'flow:established; sid:202; rev:1;)'
+        )
+        result = builtin_null_heavy_content(rule)
+        assert result is None
+
+    def test_no_content_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"None"; sid:203; rev:1;)'
+        )
+        result = builtin_null_heavy_content(rule)
+        assert result is None
+
+
+class TestBuiltinWeakMultiContent:
+    def test_all_tiny_contents_triggers(self):
+        """3 content matches, all 1 byte → triggers +10."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Weak multi"; content:"|22|"; content:"|00|"; content:"|5c|"; '
+            'flow:established; sid:300; rev:1;)'
+        )
+        result = builtin_weak_multi_content(rule)
+        assert result is not None
+        assert result.dimension == "false_positive"
+        assert result.delta == 10
+
+    def test_two_byte_contents_triggers(self):
+        """2 content matches, both 2 bytes → triggers."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Two byte"; content:"|DE AD|"; content:"|BE EF|"; '
+            'flow:established; sid:301; rev:1;)'
+        )
+        result = builtin_weak_multi_content(rule)
+        assert result is not None
+        assert result.delta == 10
+
+    def test_one_long_content_no_trigger(self):
+        """2 matches but one is 3 bytes → no trigger."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"One long"; content:"|22|"; content:"ABC"; '
+            'flow:established; sid:302; rev:1;)'
+        )
+        result = builtin_weak_multi_content(rule)
+        assert result is None
+
+    def test_single_content_no_trigger(self):
+        """Only 1 content match → no trigger (needs 2+)."""
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Single"; content:"|22|"; '
+            'flow:established; sid:303; rev:1;)'
+        )
+        result = builtin_weak_multi_content(rule)
+        assert result is None
+
+    def test_no_content_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"None"; sid:304; rev:1;)'
+        )
+        result = builtin_weak_multi_content(rule)
         assert result is None
 
 

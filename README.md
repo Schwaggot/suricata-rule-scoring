@@ -132,7 +132,12 @@ points.
 | `generic_protocol`           | +5     | ip/tcp/udp/tcp-pkt/tcp-stream with no app-layer keywords (plugin) | Without app-layer narrowing the rule matches raw transport traffic   |
 | `no_flow_state`              | +3     | No `flow` keyword                                                 | Without flow state the rule fires on every packet, not just sessions |
 | `bidirectional_fp`           | +5     | Direction is `<>` instead of `->`                                 | Evaluating both directions doubles the volume of inspected packets   |
-| `long_content_match`         | -5/-10 | 5-9 bytes: -5, 10+ bytes: -10 (plugin)                            | Match probability drops exponentially with content length            |
+| `informational_severity`     | +5     | Metadata `signature_severity` is `Informational`                  | Advisory-grade detections are inherently noisy                       |
+| `low_confidence`             | +3     | Metadata `confidence` is `Low`                                    | Rule author flagged uncertainty in the detection                     |
+| `info_classtype`             | +3     | Classtype is misc-activity, not-suspicious, or policy-violation   | Non-malicious classtypes see high volumes of benign matches          |
+| `null_heavy_content`         | +5     | >50% of content bytes are null `\|00\|` (plugin)                  | Null-padded content is common in binary protocols, low selectivity   |
+| `weak_multi_content`         | +10    | 2+ content matches, all ≤ 2 bytes each (plugin)                   | Individually non-selective matches don't compound into specificity   |
+| `long_content_match`         | -5/-10 | 5-9 effective bytes: -5, 10+: -10; null bytes discounted (plugin) | Match probability drops exponentially with content length            |
 | `specific_tls_match`         | -10    | Matches specific TLS/cert/JA3/JA4 attributes                      | Cryptographic fingerprints rarely appear in legitimate traffic       |
 | `flowbits_isset`             | -8     | Uses `flowbits:isset` (plugin)                                    | Requires a prior rule to match first — two-stage AND logic           |
 | `specific_dns_query`         | -8     | Matches specific DNS query                                        | Exact domain matches are unlikely to collide with normal lookups     |
@@ -242,9 +247,9 @@ def my_plugin(rule):
 
 Register via YAML (`callable: "my_module:my_plugin"`) or programmatically (`scorer.register_plugin("id", my_plugin)`).
 
-Ten built-in plugins ship with the default profile: `long_content_match`, `tiny_payload`, `few_content_matches`,
+Twelve built-in plugins ship with the default profile: `long_content_match`, `tiny_payload`, `few_content_matches`,
 `ip_ioc_rule`, `rule_age`, `generic_protocol`, `flowbits_isset`, `ip_ioc_fp`, `single_content_http_method`,
-and `port_specificity`.
+`port_specificity`, `null_heavy_content`, and `weak_multi_content`.
 
 ## CLI Reference
 
