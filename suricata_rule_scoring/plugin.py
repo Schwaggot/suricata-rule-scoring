@@ -189,6 +189,7 @@ def compute_content_bytes(content_str: str) -> int:
     """Compute the number of matched bytes in a content string.
 
     Handles hex blocks like |XX XX| and literal ASCII characters.
+    Hex bytes may be space-separated (|DE AD|) or concatenated (|DEAD|).
     E.g., 'GET |20|/' → 3 (GET) + 1 (hex 20) + 1 (/) = 5 bytes
     """
     total = 0
@@ -200,8 +201,8 @@ def compute_content_bytes(content_str: str) -> int:
             total += len(part)
         else:
             # Hex block: count hex byte pairs
-            hex_bytes = part.strip().split()
-            total += len(hex_bytes)
+            hex_str = part.strip().replace(" ", "")
+            total += len(hex_str) // 2
     return total
 
 
@@ -220,6 +221,27 @@ def builtin_tiny_payload(rule: SuricataRule) -> ScoringResult | None:
             dimension="quality",
             delta=-10,
             reason=f"Rule matches only {total_bytes} bytes of payload (< 3)",
+        )
+    return None
+
+
+def builtin_long_content_match(rule: SuricataRule) -> ScoringResult | None:
+    """Check if rule has 20+ bytes of total content matches.
+
+    False-positive dimension, weight -10.
+    Long, unique content strings have near-zero chance of matching
+    benign traffic, even with broad network scope.
+    """
+    contents = rule.options.content
+    if not contents:
+        return None
+
+    total_bytes = sum(compute_content_bytes(c) for c in contents)
+    if total_bytes >= 20:
+        return ScoringResult(
+            dimension="false_positive",
+            delta=-10,
+            reason=f"Rule matches {total_bytes} bytes of content (>= 20), highly specific",
         )
     return None
 
