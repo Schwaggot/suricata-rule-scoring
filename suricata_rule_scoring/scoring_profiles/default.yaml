@@ -1,4 +1,4 @@
-# Default scoring profile for suricata-rule-scorer
+# Default scoring profile for suricata-rule-scoring
 
 scoring:
   quality:

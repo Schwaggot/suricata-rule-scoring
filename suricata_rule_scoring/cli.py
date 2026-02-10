@@ -1,4 +1,4 @@
-"""CLI entry point for suricata-rule-scorer."""
+"""CLI entry point for suricata-rule-scoring."""
 
 import argparse
 import csv
@@ -7,48 +7,40 @@ import json
 import sys
 from pathlib import Path
 
-from suricata_rule_parser import parse_file
+from suricata_rule_parser import parse_file, parse_rule
 
 from .scorer import RuleScorer
 from .stats import summarize
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Suricata Rule Scorer — evaluate rules against configurable scoring criteria."""
+    """Suricata Rule Scoring — evaluate rules against configurable scoring criteria."""
     parser = argparse.ArgumentParser(
-        prog="suricata-rule-scorer",
+        prog="suricata-rule-scoring",
         description="Evaluate Suricata IDS rules against configurable scoring criteria.",
     )
-    subparsers = parser.add_subparsers(dest="command")
-
-    score_parser = subparsers.add_parser("score", help="Score Suricata rules from a .rules file.")
-    score_parser.add_argument("rules_file", help="Path to a .rules file.")
-    score_parser.add_argument("--config", dest="config_path", default=None, help="Path to custom YAML scoring profile.")
-    score_parser.add_argument("--format", dest="output_format", choices=["json", "csv"], default="json", help="Output format (default: json).")
-    score_parser.add_argument("--output", dest="output_path", default=None, help="Write results to file instead of stdout.")
-    score_parser.add_argument("--stats", dest="show_stats", action="store_true", default=False, help="Print summary statistics to stderr.")
-    score_parser.add_argument("--sort-by", dest="sort_by", choices=["quality", "false_positive"], default=None, help="Sort output by a score dimension.")
-    score_parser.add_argument("--min-quality", type=float, default=None, help="Only output rules with quality >= n.")
-    score_parser.add_argument("--max-fp", type=float, default=None, help="Only output rules with false_positive <= n.")
-    score_parser.add_argument("--verbose", action="store_true", default=False, help="Include matched criteria details in output.")
+    parser.add_argument("rules_file", nargs="?", default=None, help="Path to a .rules file.")
+    parser.add_argument("--rule", dest="inline_rule", default=None, help="Score a single rule passed as a string.")
+    parser.add_argument("--config", dest="config_path", default=None, help="Path to custom YAML scoring profile.")
+    parser.add_argument("--format", dest="output_format", choices=["json", "csv"], default="json", help="Output format (default: json).")
+    parser.add_argument("--output", dest="output_path", default=None, help="Write results to file instead of stdout.")
+    parser.add_argument("--stats", dest="show_stats", action="store_true", default=False, help="Print summary statistics to stderr.")
+    parser.add_argument("--sort-by", dest="sort_by", choices=["quality", "false_positive"], default=None, help="Sort output by a score dimension.")
+    parser.add_argument("--min-quality", type=float, default=None, help="Only output rules with quality >= n.")
+    parser.add_argument("--max-fp", type=float, default=None, help="Only output rules with false_positive <= n.")
+    parser.add_argument("--verbose", action="store_true", default=False, help="Include matched criteria details in output.")
 
     args = parser.parse_args(argv)
 
-    if args.command is None:
+    if args.inline_rule is None and args.rules_file is None:
         parser.print_help()
         sys.exit(1)
 
-    if args.command == "score":
-        _cmd_score(args)
+    _cmd_score(args)
 
 
 def _cmd_score(args: argparse.Namespace) -> None:
-    """Execute the score subcommand."""
-    # Validate input file exists
-    if not Path(args.rules_file).is_file():
-        print(f"Error: File not found: {args.rules_file}", file=sys.stderr)
-        sys.exit(2)
-
+    """Execute scoring."""
     # Load scorer
     if args.config_path:
         if not Path(args.config_path).is_file():
@@ -57,6 +49,17 @@ def _cmd_score(args: argparse.Namespace) -> None:
         scorer = RuleScorer.from_config(args.config_path)
     else:
         scorer = RuleScorer()
+
+    if args.inline_rule is not None:
+        rule = parse_rule(args.inline_rule)
+        result = scorer.score(rule)
+        _print_inline_result(rule, result)
+        return
+
+    # Validate input file exists
+    if not Path(args.rules_file).is_file():
+        print(f"Error: File not found: {args.rules_file}", file=sys.stderr)
+        sys.exit(2)
 
     # Parse and score rules
     rules = parse_file(args.rules_file)
@@ -91,6 +94,21 @@ def _cmd_score(args: argparse.Namespace) -> None:
     if args.show_stats:
         stats = summarize(results)
         _print_stats(stats)
+
+
+def _print_inline_result(rule, result) -> None:
+    """Print a human-readable scoring breakdown for a single inline rule."""
+    print(f"SID: {result.sid}  Rev: {result.rev}")
+    print(f"Msg: {rule.options.msg}")
+    print(f"Quality:        {result.quality}")
+    print(f"False-Positive: {result.false_positive}")
+    print()
+    if result.matched_criteria:
+        print("Matched criteria:")
+        for c in result.matched_criteria:
+            sign = "+" if c.delta > 0 else ""
+            print(f"  [{c.dimension:15}] {sign}{c.delta:>6}  {c.criterion_id}")
+            print(f"                           {c.reason}")
 
 
 def _format_json(results, verbose: bool) -> str:

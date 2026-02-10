@@ -37,7 +37,7 @@ dev = [
 ]
 
 [project.scripts]
-suricata-rule-scorer = "suricata_rule_scoring.cli:main"
+suricata-rule-scoring = "suricata_rule_scoring.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/Schwaggot/suricata-rule-scoring"

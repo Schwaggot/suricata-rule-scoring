@@ -22,22 +22,22 @@ pip install -e .
 
 ```bash
 # Score a rules file (JSON output)
-suricata-rule-scorer score rules/et-open/emerging-malware.rules
+suricata-rule-scoring rules/et-open/emerging-malware.rules
 
 # CSV output with summary statistics
-suricata-rule-scorer score rules/et-open/emerging-malware.rules --format csv --stats
+suricata-rule-scoring rules/et-open/emerging-malware.rules --format csv --stats
 
 # Filter and sort
-suricata-rule-scorer score rules/et-open/emerging-malware.rules --min-quality 20 --max-fp 10 --sort-by quality
+suricata-rule-scoring rules/et-open/emerging-malware.rules --min-quality 20 --max-fp 10 --sort-by quality
 
 # Verbose output (includes matched criteria)
-suricata-rule-scorer score rules/et-open/emerging-malware.rules --verbose
+suricata-rule-scoring rules/et-open/emerging-malware.rules --verbose
 
 # Use a custom scoring profile
-suricata-rule-scorer score rules/et-open/emerging-malware.rules --config my_profile.yaml
+suricata-rule-scoring rules/et-open/emerging-malware.rules --config my_profile.yaml
 
 # Write results to file
-suricata-rule-scorer score rules/et-open/emerging-malware.rules --output results.json
+suricata-rule-scoring rules/et-open/emerging-malware.rules --output results.json
 ```
 
 ### Library API
@@ -248,20 +248,33 @@ and `port_specificity`.
 
 ## CLI Reference
 
+### Score a rules file
+
 ```
-suricata-rule-scorer score <rules_file> [options]
+suricata-rule-scoring <rules_file> [options]
 ```
 
-| Option                              | Description                        | Default           |
-|-------------------------------------|------------------------------------|-------------------|
-| `--config PATH`                     | Custom YAML scoring profile        | built-in defaults |
-| `--format json\|csv`                | Output format                      | `json`            |
-| `--output PATH`                     | Write to file instead of stdout    | stdout            |
-| `--stats`                           | Print summary statistics to stderr | off               |
-| `--sort-by quality\|false_positive` | Sort output                        | unsorted          |
-| `--min-quality FLOAT`               | Filter: quality >= n               | none              |
-| `--max-fp FLOAT`                    | Filter: false_positive <= n        | none              |
-| `--verbose`                         | Include matched criteria in output | off               |
+### Score a single rule inline
+
+```
+suricata-rule-scoring --rule 'alert tcp ...(sid:123; rev:1;)'
+```
+
+Prints a human-readable breakdown with SID, message, both scores, and all matched criteria.
+
+### Options
+
+| Option                              | Description                                | Default           |
+|-------------------------------------|--------------------------------------------|-------------------|
+| `--rule RULE`                       | Score a single rule passed as a string     |                   |
+| `--config PATH`                     | Custom YAML scoring profile                | built-in defaults |
+| `--format json\|csv`                | Output format (file mode only)             | `json`            |
+| `--output PATH`                     | Write results to file instead of stdout    | stdout            |
+| `--stats`                           | Print summary statistics to stderr         | off               |
+| `--sort-by quality\|false_positive` | Sort output                                | unsorted          |
+| `--min-quality FLOAT`               | Filter: quality >= n                       | none              |
+| `--max-fp FLOAT`                    | Filter: false_positive <= n                | none              |
+| `--verbose`                         | Include matched criteria details in output | off               |
 
 ## Testing
 
