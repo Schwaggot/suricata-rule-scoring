@@ -237,11 +237,11 @@ def builtin_long_content_match(rule: SuricataRule) -> ScoringResult | None:
         return None
 
     total_bytes = sum(compute_content_bytes(c) for c in contents)
-    if total_bytes >= 20:
+    if total_bytes >= 10:
         return ScoringResult(
             dimension="false_positive",
             delta=-10,
-            reason=f"Rule matches {total_bytes} bytes of content (>= 20), highly specific",
+            reason=f"Rule matches {total_bytes} bytes of content (>= 10), highly specific",
         )
     return None
 

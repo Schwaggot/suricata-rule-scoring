@@ -124,15 +124,15 @@ points.
 
 | ID                           | Weight | Condition                                                         | Reasoning                                                            |
 |------------------------------|--------|-------------------------------------------------------------------|----------------------------------------------------------------------|
-| `broad_network_scope`        | +10    | Both src and dst addresses are `any`                              | Monitoring all traffic in both directions maximises false matches    |
+| `broad_network_scope`        | +8     | Both src and dst addresses are `any`                              | Monitoring all traffic in both directions maximises false matches    |
 | `single_content_http_method` | +8     | Only content is a common HTTP method (plugin)                     | GET/POST alone matches virtually all HTTP traffic                    |
 | `few_content_matches`        | +8     | Single content match under 5 bytes (plugin)                       | A short, single pattern is likely to collide with benign traffic     |
 | `pcre_only`                  | +7     | PCRE-only detection, no content anchor                            | Regex-only rules are slow and prone to partial/accidental matches    |
-| `any_ports`                  | +5     | Both src and dst ports are `any`                                  | No port restriction means every connection is evaluated              |
+| `any_ports`                  | +3     | Both src and dst ports are `any`                                  | No port restriction means every connection is evaluated              |
 | `generic_protocol`           | +5     | ip/tcp/udp/tcp-pkt/tcp-stream with no app-layer keywords (plugin) | Without app-layer narrowing the rule matches raw transport traffic   |
-| `no_flow_state`              | +5     | No `flow` keyword                                                 | Without flow state the rule fires on every packet, not just sessions |
+| `no_flow_state`              | +3     | No `flow` keyword                                                 | Without flow state the rule fires on every packet, not just sessions |
 | `bidirectional_fp`           | +5     | Direction is `<>` instead of `->`                                 | Evaluating both directions doubles the volume of inspected packets   |
-| `long_content_match`         | -10    | Total content >= 20 bytes (plugin)                                | Long unique content has near-zero chance of matching benign traffic  |
+| `long_content_match`         | -10    | Total content >= 10 bytes (plugin)                                | Long unique content has near-zero chance of matching benign traffic  |
 | `specific_tls_match`         | -10    | Matches specific TLS/cert/JA3/JA4 attributes                      | Cryptographic fingerprints rarely appear in legitimate traffic       |
 | `flowbits_isset`             | -8     | Uses `flowbits:isset` (plugin)                                    | Requires a prior rule to match first — two-stage AND logic           |
 | `specific_dns_query`         | -8     | Matches specific DNS query                                        | Exact domain matches are unlikely to collide with normal lookups     |

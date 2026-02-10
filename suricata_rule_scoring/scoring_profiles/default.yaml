@@ -277,7 +277,7 @@ criteria:
     name: "Broad network scope"
     description: "Both source and destination addresses are any — high FP risk"
     dimension: false_positive
-    weight: 10
+    weight: 8
     condition:
       operator: "all"
       conditions:
@@ -292,7 +292,7 @@ criteria:
     name: "Any ports"
     description: "Both source and destination ports are any"
     dimension: false_positive
-    weight: 5
+    weight: 3
     condition:
       operator: "all"
       conditions:
@@ -311,7 +311,7 @@ criteria:
     name: "No flow state"
     description: "Rule does not specify flow keyword"
     dimension: false_positive
-    weight: 5
+    weight: 3
     condition:
       operator: "not"
       condition:
