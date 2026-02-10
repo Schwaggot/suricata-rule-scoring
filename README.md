@@ -97,39 +97,39 @@ points.
 
 ### Default Quality Criteria
 
-| ID                     | Weight  | Condition                                     |
-|------------------------|---------|-----------------------------------------------|
-| `has_content_match`    | +10     | Has at least one `content` keyword            |
-| `has_fast_pattern`     | +5      | Uses `fast_pattern`                           |
-| `specific_protocol`    | +5      | Protocol is not `ip`                          |
-| `has_flow_direction`   | +5      | Specifies `flow` keyword                      |
-| `has_reference`        | +3      | Includes a reference (CVE, URL, etc.)         |
-| `has_classtype`        | +3      | Includes `classtype`                          |
-| `has_metadata`         | +2      | Includes `metadata`                           |
-| `tls_fingerprint`      | +15     | Matches TLS cert/JA3/JA4 fingerprint fields   |
-| `deep_content`         | +8      | 3+ content matches                            |
-| `pcre_without_content` | -10     | PCRE with no content anchor                   |
-| `no_content_match`     | -10     | No content, pcre, or app-layer match          |
-| `ip_ioc_rule`          | +10/+15 | Targets a specific IP; +15 with port (plugin) |
-| `tiny_payload`         | -10     | Matches fewer than 3 bytes total (plugin)     |
-| `any_any_source`       | -3      | Source address and port are both `any`        |
-| `any_any_dest`         | -3      | Destination address and port are both `any`   |
+| ID                     | Weight  | Condition                                     | Reasoning                                                          |
+|------------------------|---------|-----------------------------------------------|--------------------------------------------------------------------|
+| `has_content_match`    | +10     | Has at least one `content` keyword            | Content matches are the foundation of effective signature detection |
+| `has_fast_pattern`     | +5      | Uses `fast_pattern`                           | Enables the multi-pattern matcher for efficient pre-filtering      |
+| `specific_protocol`    | +5      | Protocol is not `ip`                          | Narrowing the protocol reduces unnecessary evaluation overhead     |
+| `has_flow_direction`   | +5      | Specifies `flow` keyword                      | Flow tracking ensures the rule fires at the right stage            |
+| `has_reference`        | +3      | Includes a reference (CVE, URL, etc.)         | References aid triage and link the rule to known threats            |
+| `has_classtype`        | +3      | Includes `classtype`                          | Classification enables priority-based alert handling               |
+| `has_metadata`         | +2      | Includes `metadata`                           | Metadata supports automated enrichment and filtering               |
+| `tls_fingerprint`      | +15     | Matches TLS cert/JA3/JA4 fingerprint fields   | Cryptographic fingerprints are highly specific indicators          |
+| `deep_content`         | +8      | 3+ content matches                            | Multiple content matches greatly increase detection specificity    |
+| `pcre_without_content` | -10     | PCRE with no content anchor                   | Unanchored PCRE forces full payload regex scans, hurting perf      |
+| `no_content_match`     | -10     | No content, pcre, or app-layer match          | No payload inspection means the rule relies solely on headers      |
+| `ip_ioc_rule`          | +10/+15 | Targets a specific IP; +15 with port (plugin) | Literal IP/port IoCs are valid detection even without content      |
+| `tiny_payload`         | -10     | Matches fewer than 3 bytes total (plugin)     | Very short patterns match too broadly and lack uniqueness          |
+| `any_any_source`       | -3      | Source address and port are both `any`         | Unrestricted source widens the rule's attack surface               |
+| `any_any_dest`         | -3      | Destination address and port are both `any`    | Unrestricted destination means every packet is a candidate         |
 
 ### Default False-Positive Criteria
 
-| ID                    | Weight | Condition                                      |
-|-----------------------|--------|------------------------------------------------|
-| `broad_network_scope` | +10    | Both src and dst addresses are `any`           |
-| `any_ports`           | +5     | Both src and dst ports are `any`               |
-| `generic_protocol`    | +5     | `ip`/`tcp` with no app-layer keywords (plugin) |
-| `few_content_matches` | +8     | Single content match under 5 bytes (plugin)    |
-| `no_flow_state`       | +5     | No `flow` keyword                              |
-| `pcre_only`           | +7     | PCRE-only detection, no content anchor         |
-| `specific_tls_match`  | -10    | Matches specific TLS/cert/JA3/JA4 attributes   |
-| `specific_dns_query`  | -8     | Matches specific DNS query                     |
-| `tight_port_scope`    | -5     | Both ports are specific (not `any`)            |
-| `multi_content`       | -5     | 3+ content matches                             |
-| `has_threshold`       | -5     | Uses `threshold` or `detection_filter`         |
+| ID                    | Weight | Condition                                      | Reasoning                                                           |
+|-----------------------|--------|-------------------------------------------------|---------------------------------------------------------------------|
+| `broad_network_scope` | +10    | Both src and dst addresses are `any`            | Monitoring all traffic in both directions maximises false matches    |
+| `any_ports`           | +5     | Both src and dst ports are `any`                | No port restriction means every connection is evaluated             |
+| `generic_protocol`    | +5     | `ip`/`tcp` with no app-layer keywords (plugin)  | Without app-layer narrowing the rule matches raw transport traffic  |
+| `few_content_matches` | +8     | Single content match under 5 bytes (plugin)     | A short, single pattern is likely to collide with benign traffic    |
+| `no_flow_state`       | +5     | No `flow` keyword                               | Without flow state the rule fires on every packet, not just sessions|
+| `pcre_only`           | +7     | PCRE-only detection, no content anchor          | Regex-only rules are slow and prone to partial/accidental matches   |
+| `specific_tls_match`  | -10    | Matches specific TLS/cert/JA3/JA4 attributes    | Cryptographic fingerprints rarely appear in legitimate traffic      |
+| `specific_dns_query`  | -8     | Matches specific DNS query                      | Exact domain matches are unlikely to collide with normal lookups    |
+| `tight_port_scope`    | -5     | Both ports are specific (not `any`)             | Specific ports limit evaluation to relevant services only           |
+| `multi_content`       | -5     | 3+ content matches                              | Multiple patterns must all match, greatly reducing coincidences     |
+| `has_threshold`       | -5     | Uses `threshold` or `detection_filter`          | Rate-limiting suppresses repeated alerts from noisy matches         |
 
 ## Custom Scoring Profiles
 
