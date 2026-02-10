@@ -1,5 +1,8 @@
 """Tests for the plugin system and built-in plugins."""
 
+from datetime import date
+from unittest.mock import patch
+
 import pytest
 from suricata_rule_parser import parse_rule
 
@@ -7,6 +10,7 @@ from suricata_rule_scoring.plugin import (
     builtin_few_content_matches,
     builtin_generic_protocol,
     builtin_ip_ioc_rule,
+    builtin_rule_age,
     builtin_tiny_payload,
     compute_content_bytes,
     load_plugin,
@@ -178,6 +182,86 @@ class TestBuiltinIpIocRule:
             '(msg:"Vars"; sid:5; rev:1;)'
         )
         result = builtin_ip_ioc_rule(rule)
+        assert result is None
+
+
+class TestBuiltinRuleAge:
+    """All tests pin today to 2026-01-15 for deterministic age calculations."""
+
+    FIXED_TODAY = date(2026, 1, 15)
+
+    def _rule_with_metadata(self, meta_str: str) -> object:
+        return parse_rule(
+            'alert tcp any any -> any 80 '
+            f'(msg:"Age test"; metadata: {meta_str}; sid:1; rev:1;)'
+        )
+
+    @patch("suricata_rule_scoring.plugin.date")
+    def test_under_one_year_gets_bonus(self, mock_date):
+        mock_date.today.return_value = self.FIXED_TODAY
+        rule = self._rule_with_metadata("created_at 2025_09_28")
+        result = builtin_rule_age(rule)
+        assert result is not None
+        assert result.delta == 5
+
+    @patch("suricata_rule_scoring.plugin.date")
+    def test_just_under_one_year_still_gets_bonus(self, mock_date):
+        mock_date.today.return_value = self.FIXED_TODAY
+        rule = self._rule_with_metadata("created_at 2025_03_01")
+        result = builtin_rule_age(rule)
+        assert result is not None
+        assert result.delta == 5
+
+    @patch("suricata_rule_scoring.plugin.date")
+    def test_two_year_old_is_neutral(self, mock_date):
+        mock_date.today.return_value = self.FIXED_TODAY
+        rule = self._rule_with_metadata("created_at 2024_06_01")
+        result = builtin_rule_age(rule)
+        assert result is None
+
+    @patch("suricata_rule_scoring.plugin.date")
+    def test_three_year_old_is_neutral(self, mock_date):
+        mock_date.today.return_value = self.FIXED_TODAY
+        rule = self._rule_with_metadata("created_at 2023_06_01")
+        result = builtin_rule_age(rule)
+        assert result is None
+
+    @patch("suricata_rule_scoring.plugin.date")
+    def test_four_year_old_gets_penalty(self, mock_date):
+        mock_date.today.return_value = self.FIXED_TODAY
+        rule = self._rule_with_metadata("created_at 2022_01_01")
+        result = builtin_rule_age(rule)
+        assert result is not None
+        assert result.delta == -3
+
+    @patch("suricata_rule_scoring.plugin.date")
+    def test_over_five_years_gets_max_penalty(self, mock_date):
+        mock_date.today.return_value = self.FIXED_TODAY
+        rule = self._rule_with_metadata("created_at 2018_01_01")
+        result = builtin_rule_age(rule)
+        assert result is not None
+        assert result.delta == -5
+
+    @patch("suricata_rule_scoring.plugin.date")
+    def test_updated_at_preferred_over_created_at(self, mock_date):
+        mock_date.today.return_value = self.FIXED_TODAY
+        # created_at is old but updated_at is recent
+        rule = self._rule_with_metadata("created_at 2018_01_01, updated_at 2025_12_01")
+        result = builtin_rule_age(rule)
+        assert result is not None
+        assert result.delta == 5
+
+    def test_no_metadata_returns_none(self):
+        rule = parse_rule(
+            'alert tcp any any -> any 80 '
+            '(msg:"No meta"; sid:1; rev:1;)'
+        )
+        result = builtin_rule_age(rule)
+        assert result is None
+
+    def test_no_date_fields_returns_none(self):
+        rule = self._rule_with_metadata("confidence Medium")
+        result = builtin_rule_age(rule)
         assert result is None
 
 

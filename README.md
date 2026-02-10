@@ -112,6 +112,7 @@ points.
 | `no_content_match`     | -10     | No content, pcre, or app-layer match          | No payload inspection means the rule relies solely on headers      |
 | `ip_ioc_rule`          | +10/+15 | Targets a specific IP; +15 with port (plugin) | Literal IP/port IoCs are valid detection even without content      |
 | `tiny_payload`         | -10     | Matches fewer than 3 bytes total (plugin)     | Very short patterns match too broadly and lack uniqueness          |
+| `rule_age`             | -5 to +5| Age from metadata date fields (plugin)        | Stale rules may target obsolete threats; fresh rules are relevant  |
 | `any_any_source`       | -3      | Source address and port are both `any`         | Unrestricted source widens the rule's attack surface               |
 | `any_any_dest`         | -3      | Destination address and port are both `any`    | Unrestricted destination means every packet is a candidate         |
 
@@ -226,8 +227,8 @@ def my_plugin(rule):
 
 Register via YAML (`callable: "my_module:my_plugin"`) or programmatically (`scorer.register_plugin("id", my_plugin)`).
 
-Four built-in plugins ship with the default profile: `tiny_payload`, `few_content_matches`, `generic_protocol`, and
-`ip_ioc_rule`.
+Five built-in plugins ship with the default profile: `tiny_payload`, `few_content_matches`, `ip_ioc_rule`, `rule_age`,
+and `generic_protocol`.
 
 ## CLI Reference
 

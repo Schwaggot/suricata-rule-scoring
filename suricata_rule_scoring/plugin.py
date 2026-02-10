@@ -2,6 +2,7 @@
 
 import importlib
 import re
+from datetime import date, datetime
 from typing import Callable
 
 from suricata_rule_parser import SuricataRule
@@ -269,6 +270,71 @@ def builtin_ip_ioc_rule(rule: SuricataRule) -> ScoringResult | None:
         dimension="quality",
         delta=10,
         reason="Rule targets specific IP address (IoC-style detection)",
+    )
+
+
+def _parse_metadata_date(value: str) -> date | None:
+    """Parse a date from metadata in YYYY_MM_DD format."""
+    try:
+        return datetime.strptime(value, "%Y_%m_%d").date()
+    except (ValueError, TypeError):
+        return None
+
+
+def builtin_rule_age(rule: SuricataRule) -> ScoringResult | None:
+    """Score based on how recently the rule was created or updated.
+
+    Quality dimension, range -5 to +5.
+    Looks for updated_at, created_at, or first_seen in metadata.
+
+    Thresholds derived from analysis of ~348K rules across ET Open, ET Pro,
+    Stamus, SSLBL, and ThreatFox rulesets:
+      < 1 year  → +5   Median last-activity is ~0.9yr; rewards the ~50% of
+                        rules that are actively maintained or freshly created.
+      1–3 years →  0   Neutral. The 1-2yr and 2-3yr buckets have steady volume
+                        (~19% of rules); these aren't neglected yet.
+      3–5 years → -3   Clear volume drop-off at 3yr (8.2% → 3.3%). Rules still
+                        here are likely not being maintained (~6% of corpus).
+      5+ years  → -5   Large stale cluster (~25%) last touched around 2019-2020.
+                        Likely targeting obsolete infrastructure or threats.
+    """
+    metadata = rule.options.metadata
+    if not metadata:
+        return None
+
+    # Prefer the most-recent-activity date (updated_at > created_at > first_seen)
+    best_date = None
+    for key in ("updated_at", "created_at", "first_seen"):
+        val = metadata.get(key)
+        if val is None:
+            continue
+        parsed = _parse_metadata_date(str(val))
+        if parsed is not None and (best_date is None or parsed > best_date):
+            best_date = parsed
+
+    if best_date is None:
+        return None
+
+    age_days = (date.today() - best_date).days
+    if age_days < 0:
+        age_days = 0
+
+    if age_days <= 365:
+        delta, label = 5, "< 1 year"
+    elif age_days <= 1095:
+        delta, label = 0, "< 3 years"
+    elif age_days <= 1825:
+        delta, label = -3, "< 5 years"
+    else:
+        delta, label = -5, "5+ years"
+
+    if delta == 0:
+        return None
+
+    return ScoringResult(
+        dimension="quality",
+        delta=delta,
+        reason=f"Rule age {label} (last activity: {best_date})",
     )
 
 

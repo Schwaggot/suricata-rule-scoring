@@ -376,6 +376,10 @@ plugins:
     name: "IP-based IoC rule"
     callable: "suricata_rule_scoring.plugin:builtin_ip_ioc_rule"
 
+  - id: rule_age
+    name: "Rule age"
+    callable: "suricata_rule_scoring.plugin:builtin_rule_age"
+
   - id: generic_protocol
     name: "Generic protocol"
     callable: "suricata_rule_scoring.plugin:builtin_generic_protocol"
