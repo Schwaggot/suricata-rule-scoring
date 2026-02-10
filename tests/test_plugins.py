@@ -13,6 +13,7 @@ from suricata_rule_scoring.plugin import (
     builtin_ip_ioc_fp,
     builtin_ip_ioc_rule,
     builtin_long_content_match,
+    builtin_port_specificity,
     builtin_rule_age,
     builtin_single_content_http_method,
     builtin_tiny_payload,
@@ -315,6 +316,60 @@ class TestBuiltinRuleAge:
     def test_no_date_fields_returns_none(self):
         rule = self._rule_with_metadata("confidence Medium")
         result = builtin_rule_age(rule)
+        assert result is None
+
+
+class TestBuiltinPortSpecificity:
+    def test_specific_port_gives_minus_3(self):
+        rule = parse_rule(
+            'alert tcp any any -> any 443 '
+            '(msg:"Specific port"; content:"test"; flow:established; sid:1; rev:1;)'
+        )
+        result = builtin_port_specificity(rule)
+        assert result is not None
+        assert result.dimension == "false_positive"
+        assert result.delta == -3
+
+    def test_port_range_gives_minus_1(self):
+        rule = parse_rule(
+            'alert tcp any any -> any 5800:5820 '
+            '(msg:"Port range"; content:"test"; flow:established; sid:2; rev:1;)'
+        )
+        result = builtin_port_specificity(rule)
+        assert result is not None
+        assert result.delta == -1
+
+    def test_both_specific_ports(self):
+        rule = parse_rule(
+            'alert tcp any 80 -> any 443 '
+            '(msg:"Both ports"; content:"test"; flow:established; sid:3; rev:1;)'
+        )
+        result = builtin_port_specificity(rule)
+        assert result is not None
+        assert result.delta == -6
+
+    def test_any_ports_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp any any -> any any '
+            '(msg:"Any"; content:"test"; flow:established; sid:4; rev:1;)'
+        )
+        result = builtin_port_specificity(rule)
+        assert result is None
+
+    def test_variable_port_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp any any -> any $HTTP_PORTS '
+            '(msg:"Variable"; content:"test"; flow:established; sid:5; rev:1;)'
+        )
+        result = builtin_port_specificity(rule)
+        assert result is None
+
+    def test_negated_port_no_trigger(self):
+        rule = parse_rule(
+            'alert tcp any any -> any !80 '
+            '(msg:"Negated"; content:"test"; flow:established; sid:6; rev:1;)'
+        )
+        result = builtin_port_specificity(rule)
         assert result is None
 
 

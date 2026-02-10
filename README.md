@@ -138,12 +138,14 @@ points.
 | `specific_dns_query`         | -8     | Matches specific DNS query                                        | Exact domain matches are unlikely to collide with normal lookups     |
 | `positioned_content`         | -5     | Uses depth/offset/distance/within                                 | Position-constrained content dramatically reduces coincidental hits  |
 | `byte_operations_precision`  | -5     | Uses byte_test/byte_jump/byte_extract                             | Byte-level validation virtually never matches benign traffic         |
-| `tight_port_scope`           | -5     | Both ports are specific (not `any`)                               | Specific ports limit evaluation to relevant services only            |
 | `multi_content`              | -5     | 3+ content matches                                                | Multiple patterns must all match, greatly reducing coincidences      |
 | `has_threshold`              | -5     | Uses `threshold` or `detection_filter`                            | Rate-limiting suppresses repeated alerts from noisy matches          |
 | `ip_ioc_fp`                  | -5     | Targets a specific literal IP (plugin)                            | Literal IP match has near-zero false-positive risk                   |
+| `port_specificity`           | -1/-3  | Port range: -1, specific port: -3, per side (plugin)              | Narrower port targeting limits evaluation to relevant services       |
 | `dsize_constraint`           | -3     | Uses `dsize` keyword                                              | Size constraints eliminate matches on wrong-sized packets            |
 | `has_bsize`                  | -3     | Uses `bsize` keyword                                              | Buffer size constraints reduce coincidental matches on normal data   |
+| `scoped_source_address`      | -1     | Source address is not `any`                                       | Network variable or literal narrows the evaluated traffic            |
+| `scoped_dest_address`        | -1     | Destination address is not `any`                                  | Network variable or literal narrows the evaluated traffic            |
 
 ## Custom Scoring Profiles
 
@@ -240,8 +242,9 @@ def my_plugin(rule):
 
 Register via YAML (`callable: "my_module:my_plugin"`) or programmatically (`scorer.register_plugin("id", my_plugin)`).
 
-Nine built-in plugins ship with the default profile: `long_content_match`, `tiny_payload`, `few_content_matches`,
-`ip_ioc_rule`, `rule_age`, `generic_protocol`, `flowbits_isset`, `ip_ioc_fp`, and `single_content_http_method`.
+Ten built-in plugins ship with the default profile: `long_content_match`, `tiny_payload`, `few_content_matches`,
+`ip_ioc_rule`, `rule_age`, `generic_protocol`, `flowbits_isset`, `ip_ioc_fp`, `single_content_http_method`,
+and `port_specificity`.
 
 ## CLI Reference
 

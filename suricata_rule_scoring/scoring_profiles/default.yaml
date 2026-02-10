@@ -379,20 +379,27 @@ criteria:
         - field: "options.dns_query"
           operator: "exists"
 
-  - id: tight_port_scope
-    name: "Tight port scope"
-    description: "Rule targets a specific port or narrow port range"
+  - id: scoped_source_address
+    name: "Scoped source address"
+    description: "Source address uses a network variable or literal instead of any"
     dimension: false_positive
-    weight: -5
+    weight: -1
     condition:
-      operator: "all"
-      conditions:
-        - field: "source_port"
-          operator: "neq"
-          value: "any"
-        - field: "destination_port"
-          operator: "neq"
-          value: "any"
+      field: "source_address"
+      operator: "neq"
+      value: "any"
+
+  - id: scoped_dest_address
+    name: "Scoped destination address"
+    description: "Destination address uses a network variable or literal instead of any"
+    dimension: false_positive
+    weight: -1
+    condition:
+      field: "destination_address"
+      operator: "neq"
+      value: "any"
+
+  # port_specificity — requires built-in plugin (distinguishes single port vs range)
 
   - id: multi_content
     name: "Multiple content matches"
@@ -518,3 +525,7 @@ plugins:
   - id: single_content_http_method
     name: "Single content HTTP method"
     callable: "suricata_rule_scoring.plugin:builtin_single_content_http_method"
+
+  - id: port_specificity
+    name: "Port specificity"
+    callable: "suricata_rule_scoring.plugin:builtin_port_specificity"

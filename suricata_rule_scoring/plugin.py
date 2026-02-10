@@ -426,6 +426,46 @@ def builtin_single_content_http_method(rule: SuricataRule) -> ScoringResult | No
     )
 
 
+def _is_single_port(port_str: str) -> bool:
+    """Check if port string is a single numeric port (e.g., '443')."""
+    try:
+        int(port_str)
+        return True
+    except ValueError:
+        return False
+
+
+def builtin_port_specificity(rule: SuricataRule) -> ScoringResult | None:
+    """Score based on port specificity.
+
+    False-positive dimension.
+    Specific single port (e.g., 443): -3 FP per side.
+    Port range or group (e.g., 5800:5820, [80,443]): -1 FP per side.
+    Variables ($HTTP_PORTS) and negations (!80) are ignored.
+    """
+    delta = 0
+    reasons = []
+
+    for label, port in [("source", rule.header.source_port), ("dest", rule.header.dest_port)]:
+        if port.lower() == "any" or port.startswith("!") or port.startswith("$"):
+            continue
+        if _is_single_port(port):
+            delta -= 3
+            reasons.append(f"{label} port {port}")
+        else:
+            delta -= 1
+            reasons.append(f"{label} port range {port}")
+
+    if delta == 0:
+        return None
+
+    return ScoringResult(
+        dimension="false_positive",
+        delta=delta,
+        reason=f"Specific port targeting: {', '.join(reasons)}",
+    )
+
+
 def builtin_generic_protocol(rule: SuricataRule) -> ScoringResult | None:
     """Check if protocol is ip/tcp/udp with no app-layer narrowing.
 
